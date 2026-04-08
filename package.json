@@ -50,7 +50,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "apcore-js": ">=0.14.0",
+    "apcore-js": "^0.17.1",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {

@@ -1,6 +1,5 @@
 import { FunctionModule, jsonSchemaToTypeBox } from 'apcore-js';
-import type { Context, ModuleAnnotations, ModuleExample } from 'apcore-js';
-import { annotationsToDict } from '../serializers.js';
+import type { Context, ModuleExample } from 'apcore-js';
 import { resolveTarget } from '../resolve-target.js';
 import type { ScannedModule } from '../types.js';
 import type { WriteResult, Verifier } from './types.js';
@@ -62,7 +61,10 @@ export class RegistryWriter {
       documentation: mod.documentation,
       tags: mod.tags.length > 0 ? [...mod.tags] : null,
       version: mod.version,
-      annotations: annotationsToDict(mod.annotations) as ModuleAnnotations | null,
+      // FunctionModule.annotations stores its input as-is, so we must pass the
+      // camelCase runtime ModuleAnnotations (not the snake_case wire form
+      // emitted by annotationsToDict, which is for YAML/serializer output).
+      annotations: mod.annotations,
       metadata: Object.keys(mod.metadata).length > 0 ? { ...mod.metadata } : null,
       examples: mod.examples.length > 0 ? ([...mod.examples] as ModuleExample[]) : null,
     });

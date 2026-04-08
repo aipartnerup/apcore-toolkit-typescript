@@ -14,6 +14,57 @@ import { DEFAULT_ANNOTATIONS } from 'apcore-js';
 import type { ScannedModule } from './types.js';
 import { cloneModule } from './types.js';
 
+/**
+ * SLM-eligible ModuleAnnotations field metadata.
+ *
+ * Each entry maps the wire-format snake_case key (used in the SLM prompt and
+ * the SLM JSON response) to the runtime camelCase key on apcore-js'
+ * ModuleAnnotations interface, plus a runtime type validator.
+ *
+ * Derived from `DEFAULT_ANNOTATIONS` at module load time so that adding a new
+ * field upstream automatically widens what the SLM may populate. The `extra`
+ * field is excluded — it is reserved for adapter extensions and must not be
+ * populated by SLM judgement. `cacheKeyFields` is special-cased because its
+ * runtime default is `null`, which `typeof` reports as `'object'`.
+ */
+interface AnnotationFieldSpec {
+  readonly camelKey: keyof ModuleAnnotations;
+  readonly validate: (v: unknown) => boolean;
+}
+
+function camelToSnake(camel: string): string {
+  return camel.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+}
+
+function buildAnnotationFieldSpecs(): Map<string, AnnotationFieldSpec> {
+  const specs = new Map<string, AnnotationFieldSpec>();
+  for (const [camelKey, defaultValue] of Object.entries(DEFAULT_ANNOTATIONS)) {
+    if (camelKey === 'extra') continue;
+    let validate: (v: unknown) => boolean;
+    if (camelKey === 'cacheKeyFields') {
+      // Default is null but the field type is `string[] | null`.
+      validate = (v) => v === null || (Array.isArray(v) && v.every((x) => typeof x === 'string'));
+    } else if (typeof defaultValue === 'boolean') {
+      validate = (v) => typeof v === 'boolean';
+    } else if (typeof defaultValue === 'number') {
+      // Reject booleans (not subclass of number in TS, but be defensive).
+      validate = (v) => typeof v === 'number' && Number.isFinite(v);
+    } else if (typeof defaultValue === 'string') {
+      validate = (v) => typeof v === 'string';
+    } else {
+      // Unknown shape — skip rather than risk garbage data.
+      continue;
+    }
+    specs.set(camelToSnake(camelKey), {
+      camelKey: camelKey as keyof ModuleAnnotations,
+      validate,
+    });
+  }
+  return specs;
+}
+
+const ANNOTATION_FIELD_SPECS = buildAnnotationFieldSpecs();
+
 const _DEFAULT_ENDPOINT = 'http://localhost:11434/v1';
 const _DEFAULT_MODEL = 'qwen:0.6b';
 const _DEFAULT_THRESHOLD = 0.7;
@@ -159,57 +210,20 @@ export class AIEnhancer {
     }
 
     if (gaps.includes('annotations') && parsed.annotations && typeof parsed.annotations === 'object') {
+      // SLM produces wire-format snake_case keys; ANNOTATION_FIELD_SPECS maps
+      // each snake key to the camelCase ModuleAnnotations property and a type
+      // validator. Confidence-gated values are merged into the camelCase base
+      // so the resulting annotations object is a valid ModuleAnnotations.
       const annData = parsed.annotations as Record<string, unknown>;
-      const accepted: Record<string, unknown> = {};
-      const boolFields = [
-        'readonly', 'destructive', 'idempotent', 'requires_approval',
-        'open_world', 'streaming', 'cacheable', 'paginated',
-      ];
-      for (const field of boolFields) {
-        if (typeof annData[field] === 'boolean') {
-          const fieldConf = parsedConf[`annotations.${field}`] ?? parsedConf[field] ?? 0;
-          confidence[`annotations.${field}`] = fieldConf;
-          if (fieldConf >= this.threshold) {
-            accepted[field] = annData[field];
-          } else {
-            warnings.push(`Low confidence (${fieldConf.toFixed(2)}) for annotations.${field} — skipped. Review manually.`);
-          }
-        }
-      }
-      // Handle integer annotation fields
-      const intFields = ['cache_ttl'] as const;
-      for (const field of intFields) {
-        if (typeof annData[field] === 'number') {
-          const fieldConf = parsedConf[`annotations.${field}`] ?? parsedConf[field] ?? 0;
-          confidence[`annotations.${field}`] = fieldConf;
-          if (fieldConf >= this.threshold) {
-            accepted[field] = annData[field];
-          } else {
-            warnings.push(`Low confidence (${fieldConf.toFixed(2)}) for annotations.${field} — skipped. Review manually.`);
-          }
-        }
-      }
-      // Handle string annotation fields
-      const strFields = ['pagination_style'] as const;
-      for (const field of strFields) {
-        if (typeof annData[field] === 'string') {
-          const fieldConf = parsedConf[`annotations.${field}`] ?? parsedConf[field] ?? 0;
-          confidence[`annotations.${field}`] = fieldConf;
-          if (fieldConf >= this.threshold) {
-            accepted[field] = annData[field];
-          } else {
-            warnings.push(`Low confidence (${fieldConf.toFixed(2)}) for annotations.${field} — skipped. Review manually.`);
-          }
-        }
-      }
-      // Handle list annotation fields
-      if (Array.isArray(annData['cache_key_fields'])) {
-        const fieldConf = parsedConf['annotations.cache_key_fields'] ?? parsedConf['cache_key_fields'] ?? 0;
-        confidence['annotations.cache_key_fields'] = fieldConf;
+      const accepted: Partial<Record<keyof ModuleAnnotations, unknown>> = {};
+      for (const [snakeKey, spec] of ANNOTATION_FIELD_SPECS) {
+        if (!(snakeKey in annData) || !spec.validate(annData[snakeKey])) continue;
+        const fieldConf = parsedConf[`annotations.${snakeKey}`] ?? parsedConf[snakeKey] ?? 0;
+        confidence[`annotations.${snakeKey}`] = fieldConf;
         if (fieldConf >= this.threshold) {
-          accepted['cache_key_fields'] = annData['cache_key_fields'];
+          accepted[spec.camelKey] = annData[snakeKey];
         } else {
-          warnings.push(`Low confidence (${fieldConf.toFixed(2)}) for annotations.cache_key_fields — skipped. Review manually.`);
+          warnings.push(`Low confidence (${fieldConf.toFixed(2)}) for annotations.${snakeKey} — skipped. Review manually.`);
         }
       }
       if (Object.keys(accepted).length > 0) {

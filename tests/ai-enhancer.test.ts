@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createAnnotations } from 'apcore-js';
 import { AIEnhancer } from '../src/ai-enhancer.js';
 import { createScannedModule } from '../src/types.js';
 
@@ -123,12 +124,65 @@ describe('AIEnhancer', () => {
         tags: ['test'],
         target: 'test:mod',
         documentation: 'Full docs here',
-        annotations: { readonly: true, destructive: false, idempotent: false },
+        annotations: createAnnotations({ readonly: true }),
       });
       const enhancer = new AIEnhancer();
       const result = await enhancer.enhance([mod]);
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(mod); // same reference, no changes
+    });
+
+    it('merges SLM snake_case annotation fields into camelCase ModuleAnnotations', async () => {
+      // Regression: SLM emits wire-format snake_case keys; AI Enhancer must
+      // map them to apcore-js camelCase fields rather than spreading raw
+      // snake_case keys onto the runtime object (which would silently lose
+      // the SLM judgement and leave camelCase defaults in place).
+      const mod = createScannedModule({
+        moduleId: 'test.gap',
+        description: 'test.gap',
+        inputSchema: { type: 'object' },
+        outputSchema: { type: 'object' },
+        tags: [],
+        target: 'test:gap',
+      });
+      const slmJson = JSON.stringify({
+        annotations: {
+          requires_approval: true,
+          open_world: false,
+          cache_ttl: 600,
+          cache_key_fields: ['id'],
+          pagination_style: 'offset',
+        },
+        confidence: {
+          'annotations.requires_approval': 0.95,
+          'annotations.open_world': 0.95,
+          'annotations.cache_ttl': 0.95,
+          'annotations.cache_key_fields': 0.95,
+          'annotations.pagination_style': 0.95,
+        },
+      });
+      const enhancer = new AIEnhancer();
+      const callLLM = vi
+        .spyOn(enhancer as unknown as { _callLLM: (p: string) => Promise<string> }, '_callLLM')
+        .mockResolvedValue(slmJson);
+
+      const [enhanced] = await enhancer.enhance([mod]);
+      callLLM.mockRestore();
+
+      const ann = enhanced.annotations as Record<string, unknown> | null;
+      expect(ann).not.toBeNull();
+      // camelCase fields received the SLM judgement.
+      expect(ann!.requiresApproval).toBe(true);
+      expect(ann!.openWorld).toBe(false);
+      expect(ann!.cacheTtl).toBe(600);
+      expect(ann!.cacheKeyFields).toEqual(['id']);
+      expect(ann!.paginationStyle).toBe('offset');
+      // Snake_case keys must NOT have leaked through onto the runtime object.
+      expect(ann).not.toHaveProperty('requires_approval');
+      expect(ann).not.toHaveProperty('open_world');
+      expect(ann).not.toHaveProperty('cache_ttl');
+      expect(ann).not.toHaveProperty('cache_key_fields');
+      expect(ann).not.toHaveProperty('pagination_style');
     });
   });
 });

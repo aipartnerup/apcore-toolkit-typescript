@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createAnnotations } from 'apcore-js';
 import { mkdtempSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -116,7 +117,7 @@ describe('YAMLWriter', () => {
       const mod = makeModule({
         moduleId: 'content-test',
         version: '2.0.0',
-        annotations: { readOnly: true },
+        annotations: createAnnotations({ readonly: true, requiresApproval: true }),
         documentation: 'Some docs',
         examples: [{ name: 'ex1', input: { key: 'val' }, output: { result: 'ok' } }],
         metadata: { author: 'test' },
@@ -130,6 +131,10 @@ describe('YAMLWriter', () => {
       expect(content).toContain('module_id: content-test');
       expect(content).toContain('version: 2.0.0');
       expect(content).toContain('documentation: Some docs');
+      // Annotations must be emitted in snake_case wire format for cross-language interop.
+      expect(content).toContain('readonly: true');
+      expect(content).toContain('requires_approval: true');
+      expect(content).not.toContain('requiresApproval');
 
       rmSync(tmpDir, { recursive: true, force: true });
     });

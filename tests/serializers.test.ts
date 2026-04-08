@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { createAnnotations } from 'apcore-js';
 import { annotationsToDict, moduleToDict, modulesToDicts } from '../src/serializers.js';
 import { createScannedModule } from '../src/types.js';
 
@@ -20,10 +21,31 @@ describe('annotationsToDict', () => {
     expect(annotationsToDict(undefined)).toBeNull();
   });
 
-  it('returns the object as-is for a plain object', () => {
-    const annotations = { readOnly: true, destructive: false, idempotent: true };
+  it('converts camelCase ModuleAnnotations to snake_case wire format', () => {
+    const annotations = createAnnotations({
+      readonly: true,
+      requiresApproval: true,
+      cacheTtl: 300,
+      paginationStyle: 'offset',
+    });
     const result = annotationsToDict(annotations);
-    expect(result).toEqual({ readOnly: true, destructive: false, idempotent: true });
+    expect(result).toMatchObject({
+      readonly: true,
+      destructive: false,
+      idempotent: false,
+      requires_approval: true,
+      open_world: true,
+      streaming: false,
+      cacheable: false,
+      cache_ttl: 300,
+      cache_key_fields: null,
+      paginated: false,
+      pagination_style: 'offset',
+    });
+    // No camelCase keys should leak through.
+    expect(result).not.toHaveProperty('requiresApproval');
+    expect(result).not.toHaveProperty('cacheTtl');
+    expect(result).not.toHaveProperty('paginationStyle');
   });
 
   it('logs warning and returns null for unrecognized types', () => {
@@ -60,7 +82,7 @@ describe('moduleToDict', () => {
     const mod = createScannedModule({
       ...REQUIRED_FIELDS,
       version: '2.0.0',
-      annotations: { readOnly: true },
+      annotations: createAnnotations({ readonly: true }),
       documentation: 'Some docs',
       examples: [{ name: 'ex1', input: {}, output: {} }],
       metadata: { author: 'test' },
@@ -69,19 +91,24 @@ describe('moduleToDict', () => {
 
     const result = moduleToDict(mod);
 
-    expect(result).toEqual({
-      module_id: 'test-module',
-      description: 'A test module',
-      input_schema: { type: 'object' },
-      output_schema: { type: 'string' },
-      tags: ['test', 'example'],
-      target: 'http://localhost:8080/api/test',
-      version: '2.0.0',
-      annotations: { readOnly: true },
-      documentation: 'Some docs',
-      examples: [{ name: 'ex1', input: {}, output: {} }],
-      metadata: { author: 'test' },
-      warnings: ['warn1'],
+    // Top-level fields use snake_case for cross-language wire format parity.
+    expect(result.module_id).toBe('test-module');
+    expect(result.description).toBe('A test module');
+    expect(result.input_schema).toEqual({ type: 'object' });
+    expect(result.output_schema).toEqual({ type: 'string' });
+    expect(result.tags).toEqual(['test', 'example']);
+    expect(result.target).toBe('http://localhost:8080/api/test');
+    expect(result.version).toBe('2.0.0');
+    expect(result.documentation).toBe('Some docs');
+    expect(result.examples).toEqual([{ name: 'ex1', input: {}, output: {} }]);
+    expect(result.metadata).toEqual({ author: 'test' });
+    expect(result.warnings).toEqual(['warn1']);
+    // Annotations are normalized to snake_case wire format via annotationsToJSON.
+    expect(result.annotations).toMatchObject({
+      readonly: true,
+      requires_approval: false,
+      cache_ttl: 0,
+      pagination_style: 'cursor',
     });
   });
 

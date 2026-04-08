@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createAnnotations } from 'apcore-js';
 import { createScannedModule } from '../src/types.js';
 import type { ScannedModule } from '../src/types.js';
 
@@ -101,7 +102,7 @@ describe('RegistryWriter', () => {
         version: '2.0.0',
         tags: ['greeting', 'test'],
         documentation: 'Says hello to people',
-        annotations: { readOnly: true },
+        annotations: createAnnotations({ readonly: true }),
         metadata: { author: 'tester' },
         examples: [{ name: 'basic', input: { name: 'World' }, output: { greeting: 'Hello, World!' } }],
       });
@@ -117,7 +118,18 @@ describe('RegistryWriter', () => {
       expect(registeredModule.version).toBe('2.0.0');
       expect(registeredModule.documentation).toBe('Says hello to people');
       expect(registeredModule.tags).toEqual(['greeting', 'test']);
-      expect(registeredModule.annotations).toEqual({ readOnly: true });
+      // FunctionModule.annotations stores its input as-is. RegistryWriter
+      // must therefore pass the camelCase runtime ModuleAnnotations so that
+      // downstream camelCase property access (e.g. fm.annotations.requiresApproval)
+      // works. The wire-format snake_case dict is reserved for YAML output.
+      expect(registeredModule.annotations).toMatchObject({
+        readonly: true,
+        requiresApproval: false,
+        cacheTtl: 0,
+        paginationStyle: 'cursor',
+      });
+      expect(registeredModule.annotations).not.toHaveProperty('requires_approval');
+      expect(registeredModule.annotations).not.toHaveProperty('cache_ttl');
       expect(registeredModule.metadata).toEqual({ author: 'tester' });
       expect(registeredModule.examples).toEqual([
         { name: 'basic', input: { name: 'World' }, output: { greeting: 'Hello, World!' } },
