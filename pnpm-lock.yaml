@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       apcore-js:
-        specifier: ^0.17.1
-        version: 0.17.1
+        specifier: '>=0.18.0'
+        version: 0.18.0
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.1
@@ -525,8 +525,8 @@ packages:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
 
-  apcore-js@0.17.1:
-    resolution: {integrity: sha512-Cael8wLXWd0IhNidlTdmIT6k5xG6jKsSh9iUFPEWUXcm5a+uesv1/FzkOhhGsSIm7XPplujAHnumkrujFd1nWg==}
+  apcore-js@0.18.0:
+    resolution: {integrity: sha512-L9Q8ZHjxIxCA14syzDR2ejGWnSYQe+tWkyn6luIeRjjNl+BWqjORd+9Snfr8V7Q7i/ZLtCCxZjDofj6lXY/fMQ==}
     engines: {node: '>=18.0.0'}
 
   apdev-js@0.2.0:
@@ -1036,8 +1036,8 @@ packages:
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
 
-  uuid@9.0.1:
-    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
+  uuid@11.1.0:
+    resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
     hasBin: true
 
   vite-node@3.2.4:
@@ -1502,11 +1502,11 @@ snapshots:
 
   ansi-styles@6.2.3: {}
 
-  apcore-js@0.17.1:
+  apcore-js@0.18.0:
     dependencies:
       '@sinclair/typebox': 0.34.48
       js-yaml: 4.1.1
-      uuid: 9.0.1
+      uuid: 11.1.0
 
   apdev-js@0.2.0(typescript@5.9.3):
     dependencies:
@@ -2025,7 +2025,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  uuid@9.0.1: {}
+  uuid@11.1.0: {}
 
   vite-node@3.2.4(@types/node@22.19.15):
     dependencies:
