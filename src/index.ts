@@ -1,6 +1,12 @@
 export type { ScannedModule } from './types.js';
 export { createScannedModule, cloneModule } from './types.js';
 export { BaseScanner } from './scanner.js';
+export {
+  SCANNER_VERB_MAP,
+  hasPathParams,
+  resolveHttpVerb,
+  generateSuggestedAlias,
+} from './http-verb-map.js';
 export { enrichSchemaDescriptions } from './schema-utils.js';
 export {
   resolveRef,

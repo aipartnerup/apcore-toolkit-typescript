@@ -1,5 +1,6 @@
 import type { ModuleAnnotations } from 'apcore-js';
 import { DEFAULT_ANNOTATIONS } from 'apcore-js';
+import { generateSuggestedAlias as _generateSuggestedAliasImpl } from './http-verb-map.js';
 import type { ScannedModule } from './types.js';
 import { cloneModule } from './types.js';
 
@@ -93,6 +94,27 @@ export abstract class BaseScanner {
     }
 
     return { ...DEFAULT_ANNOTATIONS };
+  }
+
+  /**
+   * Generate a human-friendly suggested alias from HTTP route info.
+   *
+   * Convenience wrapper that delegates to
+   * {@link generateSuggestedAlias | http-verb-map.generateSuggestedAlias}.
+   * Provided so scanner subclasses can call the toolkit helper through
+   * the familiar `BaseScanner` interface.
+   *
+   * @example
+   * BaseScanner.generateSuggestedAlias('/tasks/user_data', 'POST');       // "tasks.user_data.create"
+   * BaseScanner.generateSuggestedAlias('/tasks/user_data', 'GET');        // "tasks.user_data.list"
+   * BaseScanner.generateSuggestedAlias('/tasks/user_data/{id}', 'GET');   // "tasks.user_data.get"
+   *
+   * @param path - URL path (e.g., `/tasks/user_data/{id}`).
+   * @param method - HTTP method (e.g., `POST`). Case-insensitive.
+   * @returns Dot-separated alias string.
+   */
+  static generateSuggestedAlias(path: string, method: string): string {
+    return _generateSuggestedAliasImpl(path, method);
   }
 
   deduplicateIds(modules: ScannedModule[]): ScannedModule[] {

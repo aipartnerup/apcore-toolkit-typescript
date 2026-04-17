@@ -171,12 +171,23 @@ export class DisplayResolver {
     return result;
   }
 
+  /**
+   * Resolve display fields for a single ScannedModule.
+   *
+   * `suggestedAlias` is read from two sources in priority order:
+   *   1. `mod.suggestedAlias` (top-level field, preferred)
+   *   2. `mod.metadata["suggested_alias"]` (legacy fallback)
+   *
+   * The top-level field takes precedence when set to a truthy value.
+   */
   private _resolveOne(mod: ScannedModule, bindingMap: BindingMap): ScannedModule {
     const entry = bindingMap[mod.moduleId] ?? {};
     const displayCfg = (entry['display'] as Record<string, unknown>) ?? {};
     const bindingDesc = entry['description'] as string | undefined;
     const bindingDocs = entry['documentation'] as string | undefined;
-    const suggestedAlias = (mod.metadata?.['suggested_alias'] as string | undefined) ?? null;
+    const fieldAlias = (mod as { suggestedAlias?: string | null }).suggestedAlias ?? null;
+    const metaAlias = (mod.metadata?.['suggested_alias'] as string | undefined) ?? null;
+    const suggestedAlias: string | null = fieldAlias || metaAlias;
 
     // -- Resolve cross-surface defaults --
     const defaultAlias: string =

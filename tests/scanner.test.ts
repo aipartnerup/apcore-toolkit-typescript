@@ -219,4 +219,39 @@ describe('BaseScanner', () => {
       expect(duplicate.moduleId).toBe('mod-a');
     });
   });
+
+  describe('generateSuggestedAlias', () => {
+    it('POST collection', () => {
+      expect(BaseScanner.generateSuggestedAlias('/tasks/user_data', 'POST')).toBe(
+        'tasks.user_data.create',
+      );
+    });
+    it('GET collection', () => {
+      expect(BaseScanner.generateSuggestedAlias('/tasks/user_data', 'GET')).toBe(
+        'tasks.user_data.list',
+      );
+    });
+    it('GET single resource', () => {
+      expect(BaseScanner.generateSuggestedAlias('/tasks/user_data/{id}', 'GET')).toBe(
+        'tasks.user_data.get',
+      );
+    });
+    it('DELETE single resource', () => {
+      expect(BaseScanner.generateSuggestedAlias('/tasks/user_data/{id}', 'DELETE')).toBe(
+        'tasks.user_data.delete',
+      );
+    });
+    it('case insensitive method', () => {
+      expect(BaseScanner.generateSuggestedAlias('/tasks', 'post')).toBe('tasks.create');
+    });
+    it('root path returns only verb', () => {
+      expect(BaseScanner.generateSuggestedAlias('/', 'GET')).toBe('list');
+    });
+    it('callable as static on base class', () => {
+      expect(BaseScanner.generateSuggestedAlias('/users', 'POST')).toBe('users.create');
+    });
+    it('callable on subclass via static access', () => {
+      expect(TestScanner.generateSuggestedAlias('/users', 'POST')).toBe('users.create');
+    });
+  });
 });

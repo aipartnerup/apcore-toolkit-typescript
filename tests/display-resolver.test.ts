@@ -580,4 +580,100 @@ describe('DisplayResolver', () => {
       expect(infoSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('suggestedAlias dual-source resolution', () => {
+    function modWithAlias(opts: {
+      moduleId?: string;
+      suggestedAlias?: string | null;
+      metadataAlias?: string | null;
+    }): ScannedModule {
+      const metadata: Record<string, unknown> = {};
+      if (opts.metadataAlias != null) {
+        metadata['suggested_alias'] = opts.metadataAlias;
+      }
+      return createScannedModule({
+        moduleId: opts.moduleId ?? 'tasks.user_data.post',
+        description: 'x',
+        inputSchema: { type: 'object', properties: {} },
+        outputSchema: { type: 'object', properties: {} },
+        tags: [],
+        target: 'mod:func',
+        suggestedAlias: opts.suggestedAlias ?? null,
+        metadata,
+      });
+    }
+
+    it('field-only: reads suggestedAlias from top-level field', () => {
+      const m = modWithAlias({ suggestedAlias: 'tasks.user_data.create' });
+      const [resolved] = resolver.resolve([m]);
+      const display = resolved.metadata['display'] as { alias: string };
+      expect(display.alias).toBe('tasks.user_data.create');
+    });
+
+    it('metadata-only: reads legacy metadata[suggested_alias]', () => {
+      const m = modWithAlias({ metadataAlias: 'tasks.user_data.legacy' });
+      const [resolved] = resolver.resolve([m]);
+      const display = resolved.metadata['display'] as { alias: string };
+      expect(display.alias).toBe('tasks.user_data.legacy');
+    });
+
+    it('field takes precedence over metadata', () => {
+      const m = modWithAlias({
+        suggestedAlias: 'tasks.user_data.create',
+        metadataAlias: 'tasks.user_data.legacy',
+      });
+      const [resolved] = resolver.resolve([m]);
+      const display = resolved.metadata['display'] as { alias: string };
+      expect(display.alias).toBe('tasks.user_data.create');
+    });
+
+    it('falls through to module_id when neither source set', () => {
+      const m = modWithAlias({ moduleId: 'tasks.user_data.post' });
+      const [resolved] = resolver.resolve([m]);
+      const display = resolved.metadata['display'] as { alias: string };
+      expect(display.alias).toBe('tasks.user_data.post');
+    });
+
+    it('empty string field falls through to metadata', () => {
+      const m = modWithAlias({
+        suggestedAlias: '',
+        metadataAlias: 'tasks.user_data.legacy',
+      });
+      const [resolved] = resolver.resolve([m]);
+      const display = resolved.metadata['display'] as { alias: string };
+      expect(display.alias).toBe('tasks.user_data.legacy');
+    });
+
+    it('null field falls through to metadata', () => {
+      const m = modWithAlias({
+        suggestedAlias: null,
+        metadataAlias: 'tasks.user_data.legacy',
+      });
+      const [resolved] = resolver.resolve([m]);
+      const display = resolved.metadata['display'] as { alias: string };
+      expect(display.alias).toBe('tasks.user_data.legacy');
+    });
+
+    it('binding display.alias still wins over suggestedAlias', () => {
+      const m = modWithAlias({ suggestedAlias: 'tasks.user_data.create' });
+      const bindingData = {
+        bindings: [
+          {
+            module_id: 'tasks.user_data.post',
+            display: {
+              alias: 'tasks.user-data.search',
+              cli: { alias: 'tasks.user-data.search' },
+            },
+          },
+        ],
+      };
+      const [resolved] = resolver.resolve([m], { bindingData });
+      const display = resolved.metadata['display'] as {
+        alias: string;
+        cli: { alias: string };
+      };
+      expect(display.alias).toBe('tasks.user-data.search');
+      expect(display.cli.alias).toBe('tasks.user-data.search');
+    });
+  });
 });

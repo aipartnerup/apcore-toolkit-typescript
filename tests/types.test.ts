@@ -27,6 +27,7 @@ describe('createScannedModule', () => {
     expect(mod.version).toBe('1.0.0');
     expect(mod.annotations).toBeNull();
     expect(mod.documentation).toBeNull();
+    expect(mod.suggestedAlias).toBeNull();
     expect(mod.examples).toEqual([]);
     expect(mod.metadata).toEqual({});
     expect(mod.warnings).toEqual([]);
@@ -137,5 +138,47 @@ describe('cloneModule', () => {
     // But NOT the same reference (defensive copy applied after override)
     expect(cloned.tags).not.toBe(overrideTags);
     expect(cloned.warnings).not.toBe(overrideWarnings);
+  });
+});
+
+describe('suggestedAlias field', () => {
+  it('defaults to null when not provided', () => {
+    const mod = createScannedModule({ ...REQUIRED_FIELDS });
+    expect(mod.suggestedAlias).toBeNull();
+  });
+
+  it('preserves constructor value', () => {
+    const mod = createScannedModule({
+      ...REQUIRED_FIELDS,
+      suggestedAlias: 'tasks.user_data.create',
+    });
+    expect(mod.suggestedAlias).toBe('tasks.user_data.create');
+  });
+
+  it('explicit null passes through', () => {
+    const mod = createScannedModule({
+      ...REQUIRED_FIELDS,
+      suggestedAlias: null,
+    });
+    expect(mod.suggestedAlias).toBeNull();
+  });
+
+  it('is independent of metadata.suggested_alias', () => {
+    const mod = createScannedModule({
+      ...REQUIRED_FIELDS,
+      suggestedAlias: 'field_value',
+      metadata: { suggested_alias: 'metadata_value' },
+    });
+    expect(mod.suggestedAlias).toBe('field_value');
+    expect(mod.metadata['suggested_alias']).toBe('metadata_value');
+  });
+
+  it('cloneModule preserves suggestedAlias', () => {
+    const original = createScannedModule({
+      ...REQUIRED_FIELDS,
+      suggestedAlias: 'tasks.create',
+    });
+    const cloned = cloneModule(original, { moduleId: 'tasks.create_v2' });
+    expect(cloned.suggestedAlias).toBe('tasks.create');
   });
 });
