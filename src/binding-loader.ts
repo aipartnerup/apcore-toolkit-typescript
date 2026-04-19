@@ -18,10 +18,12 @@ import { createScannedModule } from './types.js';
 const SUPPORTED_SPEC_VERSIONS = new Set(['1.0']);
 const LOOSE_REQUIRED = ['module_id', 'target'] as const;
 const STRICT_EXTRA = ['input_schema', 'output_schema'] as const;
-// Cap on directory recursion depth in `_collectRecursive`. Well above any
-// realistic `.binding.yaml` tree; prevents stack blowup on pathological or
-// malicious inputs (symlink loops are already broken by `isSymbolicLink`
-// + `statSync` fallback, but defence-in-depth is cheap).
+// Cap on directory recursion depth in `_collectRecursive`. This is the
+// PRIMARY defense against symlink loops (`a -> b -> a`): `statSync` resolves
+// symlinks but does not detect cycles, so a cyclic graph would recurse until
+// the JS stack overflows without this cap. Also bounds worst-case stack
+// usage on legitimately-deep trees; 64 is well above any realistic
+// `.binding.yaml` layout.
 const MAX_RECURSION_DEPTH = 64;
 
 /** Options for {@link BindingLoader} methods. */
@@ -152,10 +154,12 @@ export class BindingLoader {
   /**
    * Recursively collect `.binding.yaml` files under `dir`. Follows symlinks
    * (for parity with the non-recursive branch, which reads file contents and
-   * thus transparently dereferences symlinks), caps recursion at
-   * {@link MAX_RECURSION_DEPTH}, and swallows `readdirSync` errors on
-   * individual subdirectories (warns and continues) so one unreadable subtree
-   * does not abort loading of the rest.
+   * thus transparently dereferences symlinks) and caps recursion at
+   * {@link MAX_RECURSION_DEPTH}. Permission errors (`EACCES`/`EPERM`) on an
+   * individual subdirectory are swallowed with a warning so one unreadable
+   * subtree does not abort loading of the rest; all other `readdirSync`
+   * failures (e.g. `EMFILE`, `ENOTDIR`) propagate so systemic problems are
+   * not silently turned into partial loads.
    */
   private _collectRecursive(dir: string, depth = 0): string[] {
     if (depth > MAX_RECURSION_DEPTH) {
@@ -168,10 +172,14 @@ export class BindingLoader {
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch (exc) {
-      console.warn(
-        `BindingLoader: cannot read ${dir}: ${(exc as Error).message}; skipping`,
-      );
-      return [];
+      const code = (exc as NodeJS.ErrnoException).code;
+      if (code === 'EACCES' || code === 'EPERM') {
+        console.warn(
+          `BindingLoader: cannot read ${dir}: ${(exc as Error).message}; skipping`,
+        );
+        return [];
+      }
+      throw exc;
     }
     const results: string[] = [];
     for (const entry of entries) {

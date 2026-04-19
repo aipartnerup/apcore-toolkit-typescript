@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as yaml from 'js-yaml';
@@ -286,6 +286,35 @@ describe('BindingLoader.load (filesystem)', () => {
     const modules = loader.load(tmpDir, { recursive: false });
     expect(modules.map((m) => m.moduleId)).toEqual(['top']);
   });
+
+  // Skip on Windows (no POSIX permission model) and when running as root
+  // (chmod 000 is ignored, so the read would succeed and the assertion flip).
+  const canDenyRead =
+    process.platform !== 'win32' &&
+    (typeof process.getuid !== 'function' || process.getuid() !== 0);
+  const itUnlessRoot = canDenyRead ? it : it.skip;
+
+  itUnlessRoot(
+    'recursive=true: swallows EACCES on an unreadable subdir, continues with the rest',
+    () => {
+      const lockedSub = join(tmpDir, 'locked');
+      mkdirSync(lockedSub);
+      writeFileSync(
+        join(tmpDir, 'top.binding.yaml'),
+        yaml.dump({ spec_version: '1.0', bindings: [{ module_id: 'top', target: 'pkg:top' }] }),
+      );
+      chmodSync(lockedSub, 0o000);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        const modules = loader.load(tmpDir, { recursive: true });
+        expect(modules.map((m) => m.moduleId)).toEqual(['top']);
+        expect(warnSpy.mock.calls.some((c) => String(c[0]).includes('cannot read'))).toBe(true);
+      } finally {
+        chmodSync(lockedSub, 0o755); // restore so afterEach rmSync can clean up
+        warnSpy.mockRestore();
+      }
+    },
+  );
 
   it('recursive=true: caps recursion depth and warns instead of blowing the stack', () => {
     // Build a chain of directories well past MAX_RECURSION_DEPTH (64).
