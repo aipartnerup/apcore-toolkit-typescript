@@ -1,18 +1,23 @@
 import type { ModuleAnnotations } from 'apcore-js';
 import { DEFAULT_ANNOTATIONS } from 'apcore-js';
-import { generateSuggestedAlias as _generateSuggestedAliasImpl } from './http-verb-map.js';
 import type { ScannedModule } from './types.js';
 import { cloneModule } from './types.js';
 
-function safeRegExp(pattern: string): RegExp {
-  try {
-    return new RegExp(pattern);
-  } catch {
-    // If the pattern is invalid regex, treat it as a literal string
-    return new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  }
-}
 
+/**
+ * Abstract base class for all apcore-toolkit scanners.
+ *
+ * Subclasses implement `scan()` to produce `ScannedModule[]` from a given
+ * source (OpenAPI spec, Express router, file system, etc.).  The base class
+ * provides shared utilities: docstring extraction, module ID deduplication,
+ * and pattern-based include/exclude filtering.
+ *
+ * @example
+ * class MyScanner extends BaseScanner {
+ *   scan(spec: OpenAPISpec): ScannedModule[] { ... }
+ *   getSourceName(): string { return 'my-scanner'; }
+ * }
+ */
 export abstract class BaseScanner {
   abstract scan(...args: unknown[]): ScannedModule[] | Promise<ScannedModule[]>;
   abstract getSourceName(): string;
@@ -68,12 +73,12 @@ export abstract class BaseScanner {
     let result = modules;
 
     if (options?.include != null) {
-      const re = safeRegExp(options.include);
+      const re = new RegExp(options.include);
       result = result.filter((m) => re.test(m.moduleId));
     }
 
     if (options?.exclude != null) {
-      const re = safeRegExp(options.exclude);
+      const re = new RegExp(options.exclude);
       result = result.filter((m) => !re.test(m.moduleId));
     }
 
@@ -94,27 +99,6 @@ export abstract class BaseScanner {
     }
 
     return { ...DEFAULT_ANNOTATIONS };
-  }
-
-  /**
-   * Generate a human-friendly suggested alias from HTTP route info.
-   *
-   * Convenience wrapper that delegates to
-   * {@link generateSuggestedAlias | http-verb-map.generateSuggestedAlias}.
-   * Provided so scanner subclasses can call the toolkit helper through
-   * the familiar `BaseScanner` interface.
-   *
-   * @example
-   * BaseScanner.generateSuggestedAlias('/tasks/user_data', 'POST');       // "tasks.user_data.create"
-   * BaseScanner.generateSuggestedAlias('/tasks/user_data', 'GET');        // "tasks.user_data.list"
-   * BaseScanner.generateSuggestedAlias('/tasks/user_data/{id}', 'GET');   // "tasks.user_data.get"
-   *
-   * @param path - URL path (e.g., `/tasks/user_data/{id}`).
-   * @param method - HTTP method (e.g., `POST`). Case-insensitive.
-   * @returns Dot-separated alias string.
-   */
-  static generateSuggestedAlias(path: string, method: string): string {
-    return _generateSuggestedAliasImpl(path, method);
   }
 
   deduplicateIds(modules: ScannedModule[]): ScannedModule[] {

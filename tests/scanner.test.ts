@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_ANNOTATIONS } from 'apcore-js';
 import { BaseScanner } from '../src/scanner.js';
+import { generateSuggestedAlias } from '../src/http-verb-map.js';
 import { createScannedModule } from '../src/types.js';
 import type { ScannedModule } from '../src/types.js';
 
@@ -95,12 +96,10 @@ describe('BaseScanner', () => {
       ]);
     });
 
-    it('falls back to literal match for invalid regex patterns', () => {
+    it('throws SyntaxError for invalid regex patterns', () => {
       const mods = [makeModule('foo.bar'), makeModule('foo(bar)')];
-      // "foo(" is invalid regex — falls back to literal match
-      const result = scanner.filterModules(mods, { include: 'foo(' });
-      expect(result).toHaveLength(1);
-      expect(result[0].moduleId).toBe('foo(bar)');
+      // "foo(" is invalid regex — now throws instead of silently falling back
+      expect(() => scanner.filterModules(mods, { include: 'foo(' })).toThrow(SyntaxError);
     });
 
     it('dots work as regex wildcards (spec-compatible)', () => {
@@ -220,38 +219,35 @@ describe('BaseScanner', () => {
     });
   });
 
-  describe('generateSuggestedAlias', () => {
+  describe('generateSuggestedAlias (top-level function)', () => {
     it('POST collection', () => {
-      expect(BaseScanner.generateSuggestedAlias('/tasks/user_data', 'POST')).toBe(
+      expect(generateSuggestedAlias('/tasks/user_data', 'POST')).toBe(
         'tasks.user_data.create',
       );
     });
     it('GET collection', () => {
-      expect(BaseScanner.generateSuggestedAlias('/tasks/user_data', 'GET')).toBe(
+      expect(generateSuggestedAlias('/tasks/user_data', 'GET')).toBe(
         'tasks.user_data.list',
       );
     });
     it('GET single resource', () => {
-      expect(BaseScanner.generateSuggestedAlias('/tasks/user_data/{id}', 'GET')).toBe(
+      expect(generateSuggestedAlias('/tasks/user_data/{id}', 'GET')).toBe(
         'tasks.user_data.get',
       );
     });
     it('DELETE single resource', () => {
-      expect(BaseScanner.generateSuggestedAlias('/tasks/user_data/{id}', 'DELETE')).toBe(
+      expect(generateSuggestedAlias('/tasks/user_data/{id}', 'DELETE')).toBe(
         'tasks.user_data.delete',
       );
     });
     it('case insensitive method', () => {
-      expect(BaseScanner.generateSuggestedAlias('/tasks', 'post')).toBe('tasks.create');
+      expect(generateSuggestedAlias('/tasks', 'post')).toBe('tasks.create');
     });
     it('root path returns only verb', () => {
-      expect(BaseScanner.generateSuggestedAlias('/', 'GET')).toBe('list');
+      expect(generateSuggestedAlias('/', 'GET')).toBe('list');
     });
-    it('callable as static on base class', () => {
-      expect(BaseScanner.generateSuggestedAlias('/users', 'POST')).toBe('users.create');
-    });
-    it('callable on subclass via static access', () => {
-      expect(TestScanner.generateSuggestedAlias('/users', 'POST')).toBe('users.create');
+    it('callable via top-level import', () => {
+      expect(generateSuggestedAlias('/users', 'POST')).toBe('users.create');
     });
   });
 });
