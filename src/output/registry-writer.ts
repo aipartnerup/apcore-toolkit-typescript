@@ -6,7 +6,26 @@ import type { WriteResult, Verifier } from './types.js';
 import { createWriteResult } from './types.js';
 import { RegistryVerifier, runVerifierChain } from './verifiers.js';
 
+/**
+ * Write scanned modules to an apcore-js registry.
+ *
+ * Resolves each module's target function via `resolveTarget`, wraps it in a
+ * `FunctionModule`, and calls `registry.register()`. Supports dry-run and
+ * built-in / custom verification.
+ */
 export class RegistryWriter {
+  /**
+   * Register modules into the provided registry.
+   *
+   * @async This method is async in TypeScript due to dynamic module loading via
+   *        `resolveTarget`. In Python and Rust the equivalent is synchronous.
+   *        Always `await` this call: `await writer.write(modules, registry)`.
+   *
+   * @param modules - Scanned modules to register.
+   * @param registry - Target registry that implements `register()`.
+   * @param options - Optional write options: `dryRun`, `verify`, `verifiers`.
+   * @returns Array of WriteResult, one per module.
+   */
   async write(
     modules: ScannedModule[],
     registry: { register(moduleId: string, module: unknown): void; getModule?(id: string): unknown },
@@ -67,6 +86,10 @@ export class RegistryWriter {
       annotations: mod.annotations,
       metadata: Object.keys(mod.metadata).length > 0 ? { ...mod.metadata } : null,
       examples: mod.examples.length > 0 ? ([...mod.examples] as ModuleExample[]) : null,
+      // NOTE: ScannedModule carries a `display` field (populated by DisplayResolver).
+      // FunctionModule in apcore-js does not currently expose a display slot, so
+      // the display metadata is intentionally omitted here. In Rust, ModuleDescriptor
+      // includes a display field — once apcore-js exposes one, wire it here.
     });
   }
 }
