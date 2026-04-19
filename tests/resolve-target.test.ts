@@ -42,4 +42,11 @@ describe("resolveTarget", () => {
     const result = await resolveTarget("node:path:join", ["/some/prefix"]);
     expect(typeof result).toBe("function");
   });
+
+  it("rejects sibling-name path that shares a prefix but is NOT a child (D2-2 regression)", async () => {
+    // /foobar/secret.js starts with /foo but is NOT under /foo/ — must be rejected
+    await expect(
+      resolveTarget("/foobar/secret.js:default", ["/foo"]),
+    ).rejects.toThrow("not under any allowed prefix");
+  });
 });

@@ -1,5 +1,5 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, sep } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import type { WriteResult, Verifier } from './types.js';
 import { createWriteResult } from './types.js';
@@ -45,7 +45,7 @@ export class TypeScriptWriter {
 
       // Path traversal protection: check raw moduleId before sanitization
       const rawResolved = resolve(join(resolvedOut, mod.moduleId));
-      if (!rawResolved.startsWith(resolvedOut + '/') && rawResolved !== resolvedOut) {
+      if (!rawResolved.startsWith(resolvedOut + sep) && rawResolved !== resolvedOut) {
         console.warn('Skipping module with path traversal in id: %s', mod.moduleId);
         continue;
       }

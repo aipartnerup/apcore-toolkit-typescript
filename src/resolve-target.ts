@@ -1,4 +1,4 @@
-import { resolve, isAbsolute } from 'node:path';
+import { resolve, isAbsolute, sep } from 'node:path';
 
 /**
  * Dynamically imports a module and resolves a named export.
@@ -31,9 +31,10 @@ export async function resolveTarget(
   const isFilePath = modulePath.startsWith('.') || isAbsolute(modulePath);
   if (isFilePath && allowedPrefixes != null && allowedPrefixes.length > 0) {
     const resolved = resolve(modulePath);
-    const allowed = allowedPrefixes.some((prefix) =>
-      resolved.startsWith(resolve(prefix)),
-    );
+    const allowed = allowedPrefixes.some((prefix) => {
+      const resolvedPrefix = resolve(prefix);
+      return resolved === resolvedPrefix || resolved.startsWith(resolvedPrefix + sep);
+    });
     if (!allowed) {
       throw new Error(
         `Import path "${modulePath}" is not under any allowed prefix: ${allowedPrefixes.join(', ')}`,
