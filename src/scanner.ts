@@ -66,6 +66,14 @@ export abstract class BaseScanner {
     return { description, documentation, params };
   }
 
+  /**
+   * Apply include/exclude regex filters to a list of scanned modules.
+   *
+   * @param modules - Modules to filter.
+   * @param options - Optional `include` and/or `exclude` regex pattern strings.
+   * @returns Filtered array of modules.
+   * @throws {SyntaxError} When `include` or `exclude` contain an invalid regex pattern.
+   */
   filterModules(
     modules: ScannedModule[],
     options?: { include?: string; exclude?: string },

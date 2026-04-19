@@ -6,6 +6,17 @@ import { createWriteResult } from './types.js';
 import { WriteError } from './errors.js';
 import { SyntaxVerifier, runVerifierChain } from './verifiers.js';
 
+/**
+ * Write scanned modules as TypeScript source files.
+ *
+ * Each module is emitted as a `<module_id>.ts` file that re-exports the
+ * target function with the apcore binding decorator applied.
+ *
+ * Language-parity note: this writer is TypeScript-only. Python uses
+ * `PythonWriter`; Rust does not have an equivalent code-generation writer.
+ * Output from this writer should not be compared to `YAMLWriter` output —
+ * they serve different purposes (runtime type-safety vs cross-SDK interchange).
+ */
 export class TypeScriptWriter {
   write(
     modules: ScannedModule[],

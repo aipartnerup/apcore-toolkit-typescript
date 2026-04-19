@@ -7,6 +7,8 @@ import { InvalidFormatError } from './errors.js';
  * Return the writer for the given output format.
  *
  * @param format - One of `"yaml"`, `"typescript"`, or `"registry"`.
+ *   Note: `"http-proxy"` is available in Python and Rust only; pass it here
+ *   and this function throws {@link InvalidFormatError}.
  * @returns The corresponding writer instance.
  * @throws {InvalidFormatError} When `format` is not a recognised format name.
  */

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as yaml from 'js-yaml';
@@ -268,6 +268,37 @@ describe('BindingLoader.load (filesystem)', () => {
     writeFileSync(f, '');
     const modules = loader.load(f);
     expect(modules).toEqual([]);
+  });
+
+  it('does NOT find nested *.binding.yaml when recursive=false (default)', () => {
+    const subDir = join(tmpDir, 'sub');
+    mkdirSync(subDir, { recursive: true });
+    writeFileSync(
+      join(subDir, 'nested.binding.yaml'),
+      yaml.dump({ spec_version: '1.0', bindings: [{ module_id: 'nested', target: 'pkg:fn' }] }),
+    );
+    // No files at top level, recursive=false should find nothing
+    const modules = loader.load(tmpDir, { recursive: false });
+    expect(modules).toHaveLength(0);
+  });
+
+  it('finds nested *.binding.yaml when recursive=true', () => {
+    const subDir = join(tmpDir, 'sub', 'deep');
+    mkdirSync(subDir, { recursive: true });
+    writeFileSync(
+      join(subDir, 'nested.binding.yaml'),
+      yaml.dump({ spec_version: '1.0', bindings: [{ module_id: 'nested.deep', target: 'pkg:fn' }] }),
+    );
+    // Also one at top level
+    writeFileSync(
+      join(tmpDir, 'top.binding.yaml'),
+      yaml.dump({ spec_version: '1.0', bindings: [{ module_id: 'top', target: 'pkg:top' }] }),
+    );
+    const modules = loader.load(tmpDir, { recursive: true });
+    const ids = modules.map((m) => m.moduleId).sort();
+    expect(ids).toContain('nested.deep');
+    expect(ids).toContain('top');
+    expect(modules).toHaveLength(2);
   });
 });
 

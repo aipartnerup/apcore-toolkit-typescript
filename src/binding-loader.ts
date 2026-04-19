@@ -26,6 +26,12 @@ export interface BindingLoadOptions {
    * Default: `false` (loose mode — only `module_id` and `target` required).
    */
   strict?: boolean;
+  /**
+   * When `true` and the path is a directory, recursively walk subdirectories
+   * to find all `**\/*.binding.yaml` files. When `false` (default), only files
+   * in the immediate directory are loaded (flat glob behaviour).
+   */
+  recursive?: boolean;
 }
 
 /** Thrown when a binding YAML entry cannot be parsed. */
@@ -75,6 +81,7 @@ export class BindingLoader {
    */
   load(filePath: string, options?: BindingLoadOptions): ScannedModule[] {
     const strict = options?.strict ?? false;
+    const recursive = options?.recursive ?? false;
 
     let stat: fs.Stats;
     try {
@@ -92,11 +99,15 @@ export class BindingLoader {
     if (stat.isFile()) {
       files = [filePath];
     } else if (stat.isDirectory()) {
-      files = fs
-        .readdirSync(filePath)
-        .filter((f) => f.endsWith('.binding.yaml'))
-        .sort()
-        .map((f) => path.join(filePath, f));
+      if (recursive) {
+        files = this._collectRecursive(filePath).sort();
+      } else {
+        files = fs
+          .readdirSync(filePath)
+          .filter((f) => f.endsWith('.binding.yaml'))
+          .sort()
+          .map((f) => path.join(filePath, f));
+      }
     } else {
       throw new BindingLoadError({
         reason: 'path is neither a file nor a directory',
@@ -238,6 +249,19 @@ export class BindingLoader {
    * Same as {@link _asRecord}, but returns `null` for absent values
    * (used for optional fields like `display`).
    */
+  private _collectRecursive(dir: string): string[] {
+    const results: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...this._collectRecursive(full));
+      } else if (entry.isFile() && entry.name.endsWith('.binding.yaml')) {
+        results.push(full);
+      }
+    }
+    return results;
+  }
+
   private _asRecordOrNull(
     value: unknown,
     fieldName: string,

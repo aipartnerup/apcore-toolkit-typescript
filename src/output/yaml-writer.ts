@@ -59,9 +59,10 @@ export class YAMLWriter {
       const filename = `${safeId}.binding.yaml`;
       const filePath = resolve(join(outputPath, filename));
 
-      // Path traversal protection: ensure resolved filePath is strictly inside
-      // outputPath by checking that the path starts with the output directory
-      // plus the OS separator (prevents foo/bar from matching foo/barbaz).
+      // Path traversal protection: both outputPath and filePath are resolve()d
+      // (normalizes `.` / `..` segments). The sep suffix prevents foo/bar from
+      // matching foo/barbaz. Note: resolve() does not dereference symlinks —
+      // a symlink inside outputPath pointing outside is not caught here.
       const normalizedOutput = outputPath.endsWith(sep) ? outputPath : outputPath + sep;
       if (!filePath.startsWith(normalizedOutput)) {
         console.warn('Skipping file outside output directory: %s', filePath);
@@ -123,7 +124,7 @@ export class YAMLWriter {
       input_schema: structuredClone(module.inputSchema),
       output_schema: structuredClone(module.outputSchema),
     };
-    if (module.display !== null) {
+    if (module.display != null) {
       binding.display = structuredClone(module.display);
     }
     return {
