@@ -124,6 +124,9 @@ export class YAMLWriter {
       input_schema: structuredClone(module.inputSchema),
       output_schema: structuredClone(module.outputSchema),
     };
+    if (module.suggestedAlias !== null) {
+      binding.suggested_alias = module.suggestedAlias;
+    }
     if (module.display !== null) {
       binding.display = structuredClone(module.display);
     }

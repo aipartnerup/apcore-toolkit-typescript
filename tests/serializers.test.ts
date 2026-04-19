@@ -126,11 +126,26 @@ describe('moduleToDict', () => {
     expect(result.examples).toEqual([]);
   });
 
-  it('has exactly 13 keys', () => {
+  it('has exactly 14 keys including suggested_alias', () => {
     const mod = createScannedModule({ ...REQUIRED_FIELDS });
     const result = moduleToDict(mod);
 
-    expect(Object.keys(result)).toHaveLength(13);
+    expect(Object.keys(result)).toHaveLength(14);
+    expect(result).toHaveProperty('suggested_alias');
+  });
+
+  it('emits suggestedAlias as suggested_alias (regression for D1-2)', () => {
+    const mod = createScannedModule({ ...REQUIRED_FIELDS, suggestedAlias: 'my_fn' });
+    const result = moduleToDict(mod);
+
+    expect(result.suggested_alias).toBe('my_fn');
+  });
+
+  it('emits null for suggested_alias when unset', () => {
+    const mod = createScannedModule({ ...REQUIRED_FIELDS });
+    const result = moduleToDict(mod);
+
+    expect(result.suggested_alias).toBeNull();
   });
 
   it('emits display as null when unset', () => {

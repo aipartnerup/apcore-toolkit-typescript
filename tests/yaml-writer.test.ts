@@ -200,6 +200,34 @@ describe('YAMLWriter', () => {
     });
   });
 
+  describe('suggestedAlias round-trip', () => {
+    it('preserves suggested_alias in written YAML (regression for D1-1)', () => {
+      const writer = new YAMLWriter();
+      const mod = makeModule({ moduleId: 'alias-test', suggestedAlias: 'my_alias' });
+      const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-writer-alias-'));
+
+      writer.write([mod], tmpDir);
+
+      const content = readFileSync(join(tmpDir, 'alias-test.binding.yaml'), 'utf-8');
+      expect(content).toContain('suggested_alias: my_alias');
+
+      rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('omits suggested_alias when null', () => {
+      const writer = new YAMLWriter();
+      const mod = makeModule({ moduleId: 'no-alias-test' });
+      const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-writer-noalias-'));
+
+      writer.write([mod], tmpDir);
+
+      const content = readFileSync(join(tmpDir, 'no-alias-test.binding.yaml'), 'utf-8');
+      expect(content).not.toContain('suggested_alias:');
+
+      rmSync(tmpDir, { recursive: true, force: true });
+    });
+  });
+
   describe('file writing', () => {
     it('writes valid YAML with header to a temp directory', () => {
       const writer = new YAMLWriter();

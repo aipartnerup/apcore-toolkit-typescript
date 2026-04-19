@@ -44,6 +44,7 @@ export function moduleToDict(
     tags: [...module.tags],
     version: module.version,
     target: module.target,
+    suggested_alias: module.suggestedAlias,
     annotations: annotationsToDict(module.annotations),
     examples: module.examples.length > 0
       ? module.examples.map((e) => ({ ...e }))
