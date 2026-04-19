@@ -105,6 +105,22 @@ export interface AIEnhancerOptions {
   timeout?: number;
 }
 
+/**
+ * AI-driven metadata enhancement using a local SLM (Small Language Model).
+ *
+ * Calls an OpenAI-compatible local API (Ollama, vLLM, LM Studio, etc.) to fill
+ * metadata gaps that static analysis cannot resolve: missing descriptions,
+ * behavioral annotation inference, and input schema generation for untyped
+ * functions.
+ *
+ * Enhancement is gated behind the `APCORE_AI_ENABLED` environment variable.
+ * All AI-generated fields are tagged with `x-generated-by: slm` in the module
+ * metadata for auditability.
+ *
+ * @example
+ * const enhancer = new AIEnhancer({ endpoint: 'http://localhost:11434/v1', model: 'qwen:0.6b' });
+ * const enhanced = await enhancer.enhance(modules);
+ */
 export class AIEnhancer {
   readonly endpoint: string;
   readonly model: string;
@@ -136,6 +152,7 @@ export class AIEnhancer {
   }
 
   async enhance(modules: ScannedModule[]): Promise<ScannedModule[]> {
+    if (!AIEnhancer.isEnabled()) return modules;
     const results: ScannedModule[] = [...modules];
 
     const pending: Array<{ idx: number; module: ScannedModule; gaps: string[] }> = [];
@@ -169,7 +186,7 @@ export class AIEnhancer {
     if (!module.documentation) {
       gaps.push('documentation');
     }
-    if (module.annotations == null || JSON.stringify(module.annotations) === JSON.stringify(DEFAULT_ANNOTATIONS)) {
+    if (module.annotations == null || Object.keys(DEFAULT_ANNOTATIONS).every(k => (module.annotations as Record<string, unknown>)[k] === (DEFAULT_ANNOTATIONS as Record<string, unknown>)[k])) {
       gaps.push('annotations');
     }
     const props = (module.inputSchema as Record<string, unknown>).properties;
@@ -296,9 +313,16 @@ export class AIEnhancer {
       parts.push('  "input_schema": <JSON Schema object for function parameters>,');
     }
 
-    parts.push('  "confidence": {');
-    parts.push('    "description": 0.0, "documentation": 0.0');
-    parts.push('  }');
+    // Build confidence keys dynamically from all annotation fields so the
+    // prompt stays in sync as DEFAULT_ANNOTATIONS evolves upstream.
+    const confidenceKeys = Object.fromEntries(
+      Object.keys(DEFAULT_ANNOTATIONS).map(k => [camelToSnake(k), 0.0])
+    );
+    const confidenceKeysJson = JSON.stringify(confidenceKeys, null, 4)
+      .split('\n')
+      .map((l, i) => i === 0 ? `  "confidence": ${l}` : `  ${l}`)
+      .join('\n');
+    parts.push(confidenceKeysJson);
     parts.push('}');
     parts.push('');
     parts.push('Respond with ONLY valid JSON, no markdown fences or explanation.');
@@ -345,7 +369,7 @@ export class AIEnhancer {
     }
   }
 
-  static _parseResponse(response: string): Record<string, unknown> {
+  private static _parseResponse(response: string): Record<string, unknown> {
     let text = response.trim();
     if (text.startsWith('```')) {
       const lines = text.split('\n');

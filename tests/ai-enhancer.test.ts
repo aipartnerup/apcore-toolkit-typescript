@@ -99,18 +99,21 @@ describe('AIEnhancer', () => {
   });
 
   describe('_parseResponse', () => {
+    // _parseResponse is private; accessed via type cast for unit testing internals.
+    const parseResponse = (s: string) => (AIEnhancer as any)._parseResponse(s) as Record<string, unknown>;
+
     it('parses plain JSON', () => {
-      const result = AIEnhancer._parseResponse('{"description": "test"}');
+      const result = parseResponse('{"description": "test"}');
       expect(result).toEqual({ description: 'test' });
     });
 
     it('strips markdown code fences', () => {
-      const result = AIEnhancer._parseResponse('```json\n{"description": "test"}\n```');
+      const result = parseResponse('```json\n{"description": "test"}\n```');
       expect(result).toEqual({ description: 'test' });
     });
 
     it('throws for invalid JSON', () => {
-      expect(() => AIEnhancer._parseResponse('not json')).toThrow('invalid JSON');
+      expect(() => parseResponse('not json')).toThrow('invalid JSON');
     });
   });
 
@@ -133,6 +136,7 @@ describe('AIEnhancer', () => {
     });
 
     it('merges SLM snake_case annotation fields into camelCase ModuleAnnotations', async () => {
+      process.env.APCORE_AI_ENABLED = 'true';
       // Regression: SLM emits wire-format snake_case keys; AI Enhancer must
       // map them to apcore-js camelCase fields rather than spreading raw
       // snake_case keys onto the runtime object (which would silently lose
