@@ -51,6 +51,7 @@ export function moduleToDict(
     metadata: { ...module.metadata },
     input_schema: { ...module.inputSchema },
     output_schema: { ...module.outputSchema },
+    display: module.display ? { ...module.display } : null,
     warnings: [...module.warnings],
   };
 }

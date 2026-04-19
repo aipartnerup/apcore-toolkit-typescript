@@ -128,6 +128,7 @@ describe('YAMLWriter', () => {
 
       const filePath = join(tmpDir, 'content-test.binding.yaml');
       const content = readFileSync(filePath, 'utf-8');
+      expect(content).toContain('spec_version:');
       expect(content).toContain('module_id: content-test');
       expect(content).toContain('version: 2.0.0');
       expect(content).toContain('documentation: Some docs');
@@ -135,6 +136,37 @@ describe('YAMLWriter', () => {
       expect(content).toContain('readonly: true');
       expect(content).toContain('requires_approval: true');
       expect(content).not.toContain('requiresApproval');
+
+      rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('omits display key when module.display is null', () => {
+      const writer = new YAMLWriter();
+      const mod = makeModule({ moduleId: 'no-display' });
+      const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-writer-nodisplay-'));
+
+      writer.write([mod], tmpDir);
+
+      const content = readFileSync(join(tmpDir, 'no-display.binding.yaml'), 'utf-8');
+      expect(content).not.toContain('display:');
+
+      rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('emits display overlay when module.display is set', () => {
+      const writer = new YAMLWriter();
+      const mod = makeModule({
+        moduleId: 'with-display',
+        display: { mcp: { alias: 'users_get' }, alias: 'users.get' },
+      });
+      const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-writer-display-'));
+
+      writer.write([mod], tmpDir);
+
+      const content = readFileSync(join(tmpDir, 'with-display.binding.yaml'), 'utf-8');
+      expect(content).toContain('display:');
+      expect(content).toContain('alias: users_get');
+      expect(content).toContain('alias: users.get');
 
       rmSync(tmpDir, { recursive: true, force: true });
     });

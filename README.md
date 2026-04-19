@@ -123,6 +123,8 @@ const dicts = modulesToDicts(modules); // batch conversion
 | `cloneModule()` | Defensive copy with optional overrides |
 | `BaseScanner` | Abstract base class for scanners |
 | `YAMLWriter` | Writes YAML binding files |
+| `BindingLoader` | Parses `.binding.yaml` files back into `ScannedModule` objects (pure-data inverse of `YAMLWriter`, with loose/strict modes) |
+| `BindingLoadError` | Error class raised when binding parsing fails; carries `filePath`, `moduleId`, `missingFields`, `reason` |
 | `TypeScriptWriter` | Generates TypeScript module wrappers |
 | `RegistryWriter` | Registers modules into an apcore Registry |
 | `getWriter()` | Factory for writer instances |

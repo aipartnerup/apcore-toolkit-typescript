@@ -126,11 +126,27 @@ describe('moduleToDict', () => {
     expect(result.examples).toEqual([]);
   });
 
-  it('has exactly 12 keys', () => {
+  it('has exactly 13 keys', () => {
     const mod = createScannedModule({ ...REQUIRED_FIELDS });
     const result = moduleToDict(mod);
 
-    expect(Object.keys(result)).toHaveLength(12);
+    expect(Object.keys(result)).toHaveLength(13);
+  });
+
+  it('emits display as null when unset', () => {
+    const mod = createScannedModule({ ...REQUIRED_FIELDS });
+    const result = moduleToDict(mod);
+
+    expect(result.display).toBeNull();
+  });
+
+  it('deep-clones display overlay when set', () => {
+    const overlay = { mcp: { alias: 'users_get' } };
+    const mod = createScannedModule({ ...REQUIRED_FIELDS, display: overlay });
+    const result = moduleToDict(mod);
+
+    expect(result.display).toEqual({ mcp: { alias: 'users_get' } });
+    expect(result.display).not.toBe(overlay);
   });
 });
 

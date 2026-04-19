@@ -186,7 +186,7 @@ export class AIEnhancer {
     if (!module.documentation) {
       gaps.push('documentation');
     }
-    if (module.annotations == null || Object.keys(DEFAULT_ANNOTATIONS).every(k => (module.annotations as Record<string, unknown>)[k] === (DEFAULT_ANNOTATIONS as Record<string, unknown>)[k])) {
+    if (module.annotations == null || Object.keys(DEFAULT_ANNOTATIONS).every(k => (module.annotations as unknown as Record<string, unknown>)[k] === (DEFAULT_ANNOTATIONS as unknown as Record<string, unknown>)[k])) {
       gaps.push('annotations');
     }
     const props = (module.inputSchema as Record<string, unknown>).properties;

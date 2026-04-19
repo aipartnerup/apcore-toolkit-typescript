@@ -19,6 +19,13 @@ export interface ScannedModule {
   readonly suggestedAlias: string | null;
   readonly examples: readonly ModuleExample[];
   readonly metadata: Record<string, unknown>;
+  /**
+   * Sparse display overlay (alias, description, cli/mcp/a2a surface
+   * overrides) persisted to binding YAML. Distinct from
+   * `metadata["display"]`, which holds the *resolved* form produced by
+   * `DisplayResolver`. Defaults to `null`.
+   */
+  readonly display: Record<string, unknown> | null;
   readonly warnings: readonly string[];
 }
 
@@ -35,6 +42,7 @@ export function createScannedModule(options: {
   suggestedAlias?: string | null;
   examples?: ModuleExample[];
   metadata?: Record<string, unknown>;
+  display?: Record<string, unknown> | null;
   warnings?: string[];
 }): ScannedModule {
   return {
@@ -50,6 +58,7 @@ export function createScannedModule(options: {
     suggestedAlias: options.suggestedAlias ?? null,
     examples: [...(options.examples ?? [])],
     metadata: { ...(options.metadata ?? {}) },
+    display: options.display ? { ...options.display } : null,
     warnings: [...(options.warnings ?? [])],
   };
 }
@@ -64,6 +73,7 @@ export function cloneModule(
     tags: [...merged.tags],
     examples: [...merged.examples],
     metadata: { ...merged.metadata },
+    display: merged.display ? { ...merged.display } : null,
     warnings: [...merged.warnings],
     inputSchema: { ...merged.inputSchema },
     outputSchema: { ...merged.outputSchema },
