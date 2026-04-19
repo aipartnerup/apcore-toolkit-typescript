@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, sep } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import { annotationsToDict } from '../serializers.js';
 import type { WriteResult, Verifier } from './types.js';
@@ -8,7 +8,22 @@ import { createWriteResult } from './types.js';
 import { WriteError } from './errors.js';
 import { YAMLVerifier, runVerifierChain } from './verifiers.js';
 
+/**
+ * Write scanned modules as YAML binding files.
+ *
+ * Each module is serialised to a `<module_id>.binding.yaml` file in the
+ * specified output directory. The YAML format conforms to the apcore binding
+ * spec (`spec_version: "1.0"`).
+ */
 export class YAMLWriter {
+  /**
+   * Serialise modules to YAML and write them to `outputDir`.
+   *
+   * @param modules - Scanned modules to write.
+   * @param outputDir - Directory to write binding files into (created if absent).
+   * @param options - Optional write options: `dryRun`, `verify`, `verifiers`.
+   * @returns Array of WriteResult, one per module.
+   */
   write(
     modules: ScannedModule[],
     outputDir: string,
@@ -44,8 +59,11 @@ export class YAMLWriter {
       const filename = `${safeId}.binding.yaml`;
       const filePath = resolve(join(outputPath, filename));
 
-      // Path traversal protection
-      if (!filePath.startsWith(outputPath)) {
+      // Path traversal protection: ensure resolved filePath is strictly inside
+      // outputPath by checking that the path starts with the output directory
+      // plus the OS separator (prevents foo/bar from matching foo/barbaz).
+      const normalizedOutput = outputPath.endsWith(sep) ? outputPath : outputPath + sep;
+      if (!filePath.startsWith(normalizedOutput)) {
         console.warn('Skipping file outside output directory: %s', filePath);
         continue;
       }
@@ -90,24 +108,27 @@ export class YAMLWriter {
   }
 
   private _buildBinding(module: ScannedModule): Record<string, unknown> {
+    const binding: Record<string, unknown> = {
+      module_id: module.moduleId,
+      target: module.target,
+      description: module.description,
+      documentation: module.documentation,
+      tags: [...module.tags],
+      version: module.version,
+      annotations: annotationsToDict(module.annotations),
+      examples: module.examples.length > 0
+        ? module.examples.map((e) => structuredClone(e))
+        : [],
+      metadata: structuredClone(module.metadata),
+      input_schema: structuredClone(module.inputSchema),
+      output_schema: structuredClone(module.outputSchema),
+    };
+    if (module.display !== null) {
+      binding.display = structuredClone(module.display);
+    }
     return {
-      bindings: [
-        {
-          module_id: module.moduleId,
-          target: module.target,
-          description: module.description,
-          documentation: module.documentation,
-          tags: [...module.tags],
-          version: module.version,
-          annotations: annotationsToDict(module.annotations),
-          examples: module.examples.length > 0
-            ? module.examples.map((e) => ({ ...e }))
-            : [],
-          metadata: structuredClone(module.metadata),
-          input_schema: structuredClone(module.inputSchema),
-          output_schema: structuredClone(module.outputSchema),
-        },
-      ],
+      spec_version: "1.0",
+      bindings: [binding],
     };
   }
 }
