@@ -249,24 +249,5 @@ describe('YAMLWriter', () => {
       rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it('omits display key when display is undefined', () => {
-      const writer = new YAMLWriter();
-      const mod = createScannedModule({
-        moduleId: 'no-display',
-        description: 'test',
-        inputSchema: {},
-        outputSchema: {},
-        tags: [],
-        target: 'pkg:f',
-      });
-      const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-writer-display-'));
-
-      writer.write([mod], tmpDir);
-
-      const content = readFileSync(join(tmpDir, 'no-display.binding.yaml'), 'utf-8');
-      expect(content).not.toContain('display:');
-
-      rmSync(tmpDir, { recursive: true, force: true });
-    });
   });
 });

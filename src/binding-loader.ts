@@ -18,6 +18,11 @@ import { createScannedModule } from './types.js';
 const SUPPORTED_SPEC_VERSIONS = new Set(['1.0']);
 const LOOSE_REQUIRED = ['module_id', 'target'] as const;
 const STRICT_EXTRA = ['input_schema', 'output_schema'] as const;
+// Cap on directory recursion depth in `_collectRecursive`. Well above any
+// realistic `.binding.yaml` tree; prevents stack blowup on pathological or
+// malicious inputs (symlink loops are already broken by `isSymbolicLink`
+// + `statSync` fallback, but defence-in-depth is cheap).
+const MAX_RECURSION_DEPTH = 64;
 
 /** Options for {@link BindingLoader} methods. */
 export interface BindingLoadOptions {
@@ -144,6 +149,56 @@ export class BindingLoader {
   // Internal helpers
   // --------------------------------------------------------------------
 
+  /**
+   * Recursively collect `.binding.yaml` files under `dir`. Follows symlinks
+   * (for parity with the non-recursive branch, which reads file contents and
+   * thus transparently dereferences symlinks), caps recursion at
+   * {@link MAX_RECURSION_DEPTH}, and swallows `readdirSync` errors on
+   * individual subdirectories (warns and continues) so one unreadable subtree
+   * does not abort loading of the rest.
+   */
+  private _collectRecursive(dir: string, depth = 0): string[] {
+    if (depth > MAX_RECURSION_DEPTH) {
+      console.warn(
+        `BindingLoader: max recursion depth (${MAX_RECURSION_DEPTH}) reached at ${dir}; stopping descent.`,
+      );
+      return [];
+    }
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (exc) {
+      console.warn(
+        `BindingLoader: cannot read ${dir}: ${(exc as Error).message}; skipping`,
+      );
+      return [];
+    }
+    const results: string[] = [];
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      let isDir = entry.isDirectory();
+      let isFile = entry.isFile();
+      // Dirent.isDirectory/isFile both return false for symlinks; follow the
+      // link with stat so symlinked bindings / bindings-dirs behave the same
+      // as real ones (matching non-recursive-branch behaviour).
+      if (entry.isSymbolicLink()) {
+        try {
+          const st = fs.statSync(full);
+          isDir = st.isDirectory();
+          isFile = st.isFile();
+        } catch {
+          continue;
+        }
+      }
+      if (isDir) {
+        results.push(...this._collectRecursive(full, depth + 1));
+      } else if (isFile && entry.name.endsWith('.binding.yaml')) {
+        results.push(full);
+      }
+    }
+    return results;
+  }
+
   private _parseDocument(
     raw: unknown,
     filePath: string | null,
@@ -249,19 +304,6 @@ export class BindingLoader {
    * Same as {@link _asRecord}, but returns `null` for absent values
    * (used for optional fields like `display`).
    */
-  private _collectRecursive(dir: string): string[] {
-    const results: string[] = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        results.push(...this._collectRecursive(full));
-      } else if (entry.isFile() && entry.name.endsWith('.binding.yaml')) {
-        results.push(full);
-      }
-    }
-    return results;
-  }
-
   private _asRecordOrNull(
     value: unknown,
     fieldName: string,

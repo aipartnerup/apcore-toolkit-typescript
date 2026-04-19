@@ -270,16 +270,45 @@ describe('BindingLoader.load (filesystem)', () => {
     expect(modules).toEqual([]);
   });
 
-  it('does NOT find nested *.binding.yaml when recursive=false (default)', () => {
+  it('recursive=false (default): finds top-level and skips nested', () => {
     const subDir = join(tmpDir, 'sub');
     mkdirSync(subDir, { recursive: true });
+    // Top-level file — must be found
+    writeFileSync(
+      join(tmpDir, 'top.binding.yaml'),
+      yaml.dump({ spec_version: '1.0', bindings: [{ module_id: 'top', target: 'pkg:top' }] }),
+    );
+    // Nested file — must NOT be found
     writeFileSync(
       join(subDir, 'nested.binding.yaml'),
       yaml.dump({ spec_version: '1.0', bindings: [{ module_id: 'nested', target: 'pkg:fn' }] }),
     );
-    // No files at top level, recursive=false should find nothing
     const modules = loader.load(tmpDir, { recursive: false });
-    expect(modules).toHaveLength(0);
+    expect(modules.map((m) => m.moduleId)).toEqual(['top']);
+  });
+
+  it('recursive=true: caps recursion depth and warns instead of blowing the stack', () => {
+    // Build a chain of directories well past MAX_RECURSION_DEPTH (64).
+    let current = tmpDir;
+    for (let i = 0; i < 70; i++) {
+      current = join(current, `d${i}`);
+      mkdirSync(current);
+    }
+    writeFileSync(
+      join(current, 'deep.binding.yaml'),
+      yaml.dump({ spec_version: '1.0', bindings: [{ module_id: 'deep', target: 'pkg:deep' }] }),
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const modules = loader.load(tmpDir, { recursive: true });
+      // The file below the depth cap is unreachable; the walker must not throw.
+      expect(modules.map((m) => m.moduleId)).not.toContain('deep');
+      expect(
+        warnSpy.mock.calls.some((c) => String(c[0]).includes('max recursion depth')),
+      ).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('finds nested *.binding.yaml when recursive=true', () => {
