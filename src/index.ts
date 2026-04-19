@@ -1,5 +1,6 @@
 export type { ScannedModule } from './types.js';
 export { createScannedModule, cloneModule } from './types.js';
+
 export { BaseScanner } from './scanner.js';
 export {
   SCANNER_VERB_MAP,
@@ -31,13 +32,14 @@ export type {
   DisplayMetadata,
   SurfaceDisplay,
 } from './display-resolver.js';
+export { BindingLoader, BindingLoadError } from './binding-loader.js';
+export type { BindingLoadOptions } from './binding-loader.js';
 export { YAMLWriter } from './output/yaml-writer.js';
 export { TypeScriptWriter } from './output/typescript-writer.js';
 export { RegistryWriter } from './output/registry-writer.js';
 export { getWriter } from './output/factory.js';
 export type { WriteResult, VerifyResult, Verifier } from './output/types.js';
-export { createWriteResult } from './output/types.js';
-export { WriteError } from './output/errors.js';
+export { WriteError, InvalidFormatError } from './output/errors.js';
 export {
   YAMLVerifier,
   SyntaxVerifier,

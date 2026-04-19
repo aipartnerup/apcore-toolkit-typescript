@@ -1,3 +1,10 @@
+export class InvalidFormatError extends Error {
+  constructor(format: string) {
+    super(`Unknown output format: "${format}"`);
+    this.name = 'InvalidFormatError';
+  }
+}
+
 export class WriteError extends Error {
   readonly path: string;
   override readonly cause: Error;
