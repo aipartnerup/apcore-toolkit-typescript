@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   WriteError,
-  createWriteResult,
   YAMLVerifier,
   SyntaxVerifier,
   JSONVerifier,
@@ -9,6 +8,7 @@ import {
   RegistryVerifier,
   runVerifierChain,
 } from '../src/index.js';
+import { createWriteResult } from '../src/output/types.js';
 import type { WriteResult, VerifyResult, Verifier } from '../src/index.js';
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,11 +47,50 @@ describe('YAMLVerifier', () => {
   it('passes for valid YAML binding files', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-verifier-'));
     const filePath = join(tmpDir, 'test.yaml');
-    writeFileSync(filePath, 'bindings:\n  - module_id: test\n', 'utf-8');
+    writeFileSync(filePath, 'bindings:\n  - module_id: test\n    target: http://localhost/fn\n', 'utf-8');
 
     const verifier = new YAMLVerifier();
     const result: VerifyResult = verifier.verify(filePath, 'test');
     expect(result.ok).toBe(true);
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('fails when bindings array is empty', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-verifier-'));
+    const filePath = join(tmpDir, 'empty-bindings.yaml');
+    writeFileSync(filePath, 'bindings: []\n', 'utf-8');
+
+    const verifier = new YAMLVerifier();
+    const result = verifier.verify(filePath, 'test');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('empty');
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('fails when module_id is missing from first binding', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-verifier-'));
+    const filePath = join(tmpDir, 'no-module-id.yaml');
+    writeFileSync(filePath, 'bindings:\n  - target: http://localhost/fn\n', 'utf-8');
+
+    const verifier = new YAMLVerifier();
+    const result = verifier.verify(filePath, 'test');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('module_id');
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('fails when target is missing from first binding', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-verifier-'));
+    const filePath = join(tmpDir, 'no-target.yaml');
+    writeFileSync(filePath, 'bindings:\n  - module_id: test\n', 'utf-8');
+
+    const verifier = new YAMLVerifier();
+    const result = verifier.verify(filePath, 'test');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('target');
 
     rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -135,6 +174,19 @@ describe('JSONVerifier', () => {
 
     rmSync(tmpDir, { recursive: true, force: true });
   });
+
+  it('returns error when schema is provided (validation not implemented without ajv)', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'json-verifier-'));
+    const filePath = join(tmpDir, 'test.json');
+    writeFileSync(filePath, '{"key": "value"}', 'utf-8');
+
+    const verifier = new JSONVerifier({ type: 'object' });
+    const result = verifier.verify(filePath, 'test');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('ajv');
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
 });
 
 describe('MagicBytesVerifier', () => {
@@ -195,7 +247,7 @@ describe('runVerifierChain', () => {
     writeFileSync(filePath, '{"bindings": []}', 'utf-8');
 
     const result = runVerifierChain(
-      [new SyntaxVerifier(), new JSONVerifier()],
+      [new JSONVerifier(), new JSONVerifier()],
       filePath,
       'test',
     );
@@ -215,5 +267,28 @@ describe('runVerifierChain', () => {
     const result = runVerifierChain([failVerifier, passVerifier], '/tmp/x', 'test');
     expect(result.ok).toBe(false);
     expect(result.error).toBe('custom failure');
+  });
+
+  it('catches a throwing verifier and returns ok:false with "Verifier crashed:" prefix', () => {
+    const throwingVerifier: Verifier = {
+      verify: () => { throw new Error('unexpected internal failure'); },
+    };
+    const passVerifier: Verifier = {
+      verify: () => ({ ok: true }),
+    };
+
+    const result = runVerifierChain([throwingVerifier, passVerifier], '/tmp/x', 'test');
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/^Verifier crashed:/);
+    expect(result.error).toContain('unexpected internal failure');
+  });
+
+  it('continues to next verifier after passing one when first does not throw', () => {
+    const passVerifier: Verifier = { verify: () => ({ ok: true }) };
+    const failVerifier: Verifier = { verify: () => ({ ok: false, error: 'second failed' }) };
+
+    const result = runVerifierChain([passVerifier, failVerifier], '/tmp/x', 'test');
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('second failed');
   });
 });
