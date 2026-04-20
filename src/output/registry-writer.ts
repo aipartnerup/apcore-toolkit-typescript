@@ -44,11 +44,16 @@ export class RegistryWriter {
         results.push(createWriteResult(mod.moduleId, null));
         continue;
       }
-      const fm = await this._toFunctionModule(mod, allowedPrefixes);
+      let fm: FunctionModule;
+      try {
+        fm = await this._toFunctionModule(mod, allowedPrefixes);
+      } catch (err) {
+        throw new WriteError(mod.moduleId, err);
+      }
       try {
         registry.register(mod.moduleId, fm);
       } catch (err) {
-        throw new WriteError(mod.moduleId, err as Error);
+        throw new WriteError(mod.moduleId, err);
       }
 
       const result = applyVerification(
