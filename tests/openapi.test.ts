@@ -396,3 +396,58 @@ describe("extractOutputSchema", () => {
     });
   });
 });
+
+// Prototype pollution regression (D2-proto)
+describe("extractInputSchema — prototype pollution guard", () => {
+  it("does not pollute Object.prototype via __proto__ parameter name", () => {
+    const op = {
+      parameters: [
+        { in: "query", name: "__proto__", schema: { type: "string" }, required: false },
+      ],
+    };
+    const before = Object.prototype as Record<string, unknown>;
+    extractInputSchema(op as Record<string, unknown>);
+    expect(before.isAdmin).toBeUndefined();
+    expect(before.type).toBeUndefined();
+  });
+
+  it("skips constructor and prototype parameter names", () => {
+    const op = {
+      parameters: [
+        { in: "query", name: "constructor", schema: { type: "string" } },
+        { in: "query", name: "prototype", schema: { type: "string" } },
+        { in: "query", name: "valid", schema: { type: "number" } },
+      ],
+    };
+    const schema = extractInputSchema(op as Record<string, unknown>);
+    const props = schema.properties as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(props, "constructor")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(props, "prototype")).toBe(false);
+    expect(props.valid).toEqual({ type: "number" });
+  });
+
+  it("does not pollute Object.prototype via __proto__ body property", () => {
+    const op = {
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                __proto__: { type: "string" },
+                normal: { type: "number" },
+              },
+            },
+          },
+        },
+      },
+    };
+    const before = Object.prototype as Record<string, unknown>;
+    extractInputSchema(op as Record<string, unknown>);
+    expect(before.type).toBeUndefined();
+    const schema = extractInputSchema(op as Record<string, unknown>);
+    const props = schema.properties as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(props, "__proto__")).toBe(false);
+    expect(props.normal).toEqual({ type: "number" });
+  });
+});

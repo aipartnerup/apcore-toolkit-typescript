@@ -1,5 +1,7 @@
 // OpenAPI schema extraction utilities
 
+const PROTO_DENY_LIST = new Set(['__proto__', 'constructor', 'prototype']);
+
 export function resolveRef(
   refString: string,
   openapiDoc: Record<string, unknown>,
@@ -105,6 +107,7 @@ export function extractInputSchema(
   for (const param of parameters) {
     if (param["in"] === "query" || param["in"] === "path") {
       const name = param["name"] as string;
+      if (PROTO_DENY_LIST.has(name)) continue;
       let paramSchema = (param["schema"] ?? { type: "string" }) as Record<string, unknown>;
       paramSchema = resolveSchema(paramSchema, openapiDoc);
       schema.properties[name] = paramSchema;
@@ -123,7 +126,11 @@ export function extractInputSchema(
     const resolved = resolveSchema(bodySchema, openapiDoc);
     const bodyProps = (resolved["properties"] ?? {}) as Record<string, unknown>;
     const bodyRequired = (resolved["required"] ?? []) as string[];
-    Object.assign(schema.properties, bodyProps);
+    for (const [k, v] of Object.entries(bodyProps)) {
+      if (!PROTO_DENY_LIST.has(k)) {
+        schema.properties[k] = v;
+      }
+    }
     schema.required.push(...bodyRequired);
   }
 
