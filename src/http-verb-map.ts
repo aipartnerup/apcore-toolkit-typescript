@@ -65,6 +65,7 @@ export function hasPathParams(path: string): boolean {
  * @returns Semantic verb string (e.g., `"create"`, `"list"`, `"get"`).
  */
 export function resolveHttpVerb(method: string, pathHasParams: boolean): string {
+  if (typeof method !== 'string') return 'unknown';
   const methodUpper = method.toUpperCase();
   if (methodUpper === 'GET') {
     const key = pathHasParams ? 'GET_ID' : 'GET';
@@ -100,6 +101,8 @@ export function resolveHttpVerb(method: string, pathHasParams: boolean): string 
  *   segments, returns just the semantic verb (e.g., `"list"`).
  */
 export function generateSuggestedAlias(path: string, method: string): string {
+  if (typeof path !== 'string') return 'unknown';
+  if (typeof method !== 'string') return 'unknown';
   const rawSegments = path
     .replace(/^\/+/, '')
     .replace(/\/+$/, '')

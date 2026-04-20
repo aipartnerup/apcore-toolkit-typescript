@@ -199,4 +199,22 @@ describe('resolveHttpVerb — GET branch fallback', () => {
     expect(resolveHttpVerb('CONNECT', false)).toBe('connect');
     expect(resolveHttpVerb('TRACE', false)).toBe('trace');
   });
+
+  // W10 regression: non-string method must not crash via .toUpperCase()
+  it('returns "unknown" for non-string method (W10)', () => {
+    expect(resolveHttpVerb(null as unknown as string, false)).toBe('unknown');
+    expect(resolveHttpVerb(undefined as unknown as string, false)).toBe('unknown');
+    expect(resolveHttpVerb(42 as unknown as string, false)).toBe('unknown');
+  });
+});
+
+// W11 regression: non-string path/method must not crash via .replace()
+describe('generateSuggestedAlias — non-string input guards (W11)', () => {
+  it('returns "unknown" for non-string path', () => {
+    expect(generateSuggestedAlias(null as unknown as string, 'GET')).toBe('unknown');
+  });
+
+  it('returns "unknown" for non-string method', () => {
+    expect(generateSuggestedAlias('/tasks', null as unknown as string)).toBe('unknown');
+  });
 });
