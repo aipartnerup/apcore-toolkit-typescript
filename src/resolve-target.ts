@@ -28,8 +28,20 @@ export async function resolveTarget(
   const modulePath = target.slice(0, lastColon);
   const exportName = target.slice(lastColon + 1);
 
-  // Validate file-path imports against allowedPrefixes
+  if (typeof modulePath !== 'string' || modulePath.length === 0) {
+    throw new Error(`Invalid target format: "${target}". Module path must be a non-empty string.`);
+  }
+
+  // When allowedPrefixes are specified, restrict to file-path imports only.
+  // node: built-ins and bare package names are not under any file prefix.
+  const isNodeBuiltin = modulePath.startsWith('node:');
   const isFilePath = modulePath.startsWith('.') || isAbsolute(modulePath);
+  const isBarePackage = !isFilePath && !isNodeBuiltin;
+  if (allowedPrefixes != null && allowedPrefixes.length > 0 && (isNodeBuiltin || isBarePackage)) {
+    throw new Error(
+      `Import "${modulePath}" is not allowed: only file-path imports are permitted when allowedPrefixes is set.`,
+    );
+  }
   if (isFilePath && allowedPrefixes != null && allowedPrefixes.length > 0) {
     let resolved = resolve(modulePath);
     try { resolved = realpathSync(resolved); } catch { /* path may not exist yet; keep logical resolve */ }
@@ -50,7 +62,7 @@ export async function resolveTarget(
     mod = (await import(modulePath)) as Record<string, unknown>;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Failed to import module "${modulePath}": ${message}`);
+    throw new Error(`Failed to import module "${modulePath}": ${message}`, { cause: err });
   }
 
   if (mod[exportName] === undefined) {

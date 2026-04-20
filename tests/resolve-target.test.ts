@@ -40,10 +40,15 @@ describe("resolveTarget", () => {
     ).rejects.toThrow("not under any allowed prefix");
   });
 
-  it("allows file-path imports under an allowed prefix", async () => {
-    // node:path is not a file path, so allowedPrefixes don't restrict it
-    const result = await resolveTarget("node:path:join", ["/some/prefix"]);
+  it("allows node: imports when no allowedPrefixes are set", async () => {
+    const result = await resolveTarget("node:path:join");
     expect(typeof result).toBe("function");
+  });
+
+  it("blocks node: built-in imports when allowedPrefixes are set (sandbox bypass prevention)", async () => {
+    await expect(
+      resolveTarget("node:path:join", ["/some/prefix"]),
+    ).rejects.toThrow("only file-path imports are permitted");
   });
 
   it("rejects sibling-name path that shares a prefix but is NOT a child (D2-2 regression)", async () => {

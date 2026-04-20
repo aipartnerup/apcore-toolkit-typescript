@@ -306,10 +306,16 @@ export class BindingLoader {
    * warning and fall back to an empty record so the malformed data does not
    * silently persist through round-trip.
    */
+  private static readonly _PROTO_DENY = new Set(['__proto__', 'constructor', 'prototype']);
+
   private _asRecord(value: unknown, fieldName: string, moduleId: string): Record<string, unknown> {
     if (value == null) return {};
     if (typeof value === 'object' && !Array.isArray(value)) {
-      return { ...(value as Record<string, unknown>) };
+      const safe: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        if (!BindingLoader._PROTO_DENY.has(k)) safe[k] = v;
+      }
+      return safe;
     }
     console.warn(
       `BindingLoader: ${fieldName} for module ${moduleId} is not a dict (${typeof value}); using empty {}`,

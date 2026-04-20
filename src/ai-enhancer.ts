@@ -213,7 +213,11 @@ export class AIEnhancer {
     if (this._annotationsAreDefault(module.annotations)) {
       gaps.push('annotations');
     }
-    const props = (module.inputSchema as Record<string, unknown>).properties;
+    const schema = module.inputSchema;
+    const props =
+      typeof schema === 'object' && schema !== null && !Array.isArray(schema)
+        ? (schema as Record<string, unknown>).properties
+        : undefined;
     if (!props || (typeof props === 'object' && Object.keys(props).length === 0)) {
       gaps.push('input_schema');
     }
@@ -258,7 +262,7 @@ export class AIEnhancer {
       const annData = parsed.annotations as Record<string, unknown>;
       const accepted: Partial<Record<keyof ModuleAnnotations, unknown>> = {};
       for (const [snakeKey, spec] of ANNOTATION_FIELD_SPECS) {
-        if (!(snakeKey in annData) || !spec.validate(annData[snakeKey])) continue;
+        if (!Object.hasOwn(annData, snakeKey) || !spec.validate(annData[snakeKey])) continue;
         const fieldConf = parsedConf[`annotations.${snakeKey}`] ?? parsedConf[snakeKey] ?? 0;
         confidence[`annotations.${snakeKey}`] = fieldConf;
         if (fieldConf >= this.threshold) {

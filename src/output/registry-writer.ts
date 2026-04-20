@@ -7,7 +7,7 @@ import { createWriteResult } from './types.js';
 import { RegistryVerifier } from './verifiers.js';
 import { WriteError } from './errors.js';
 import { applyVerification } from './base-writer.js';
-import type { BaseWriteOptions } from './base-writer.js';
+import type { FileWriteOptions } from './base-writer.js';
 
 /**
  * Write scanned modules to an apcore-js registry.
@@ -32,11 +32,12 @@ export class RegistryWriter {
   async write(
     modules: ScannedModule[],
     registry: { register(moduleId: string, module: unknown): void; getModule?(id: string): unknown },
-    options?: BaseWriteOptions & { allowedPrefixes?: string[] },
+    options?: FileWriteOptions & { allowedPrefixes?: string[] },
   ): Promise<WriteResult[]> {
     const shouldVerify = options?.verify ?? false;
     const verifiers = options?.verifiers ?? [];
     const allowedPrefixes = options?.allowedPrefixes;
+    const errorMode = options?.errorMode ?? 'throw';
     const results: WriteResult[] = [];
 
     for (const mod of modules) {
@@ -48,11 +49,19 @@ export class RegistryWriter {
       try {
         fm = await this._toFunctionModule(mod, allowedPrefixes);
       } catch (err) {
+        if (errorMode === 'collect') {
+          results.push(createWriteResult(mod.moduleId, null, false, err instanceof Error ? err.message : String(err)));
+          continue;
+        }
         throw new WriteError(mod.moduleId, err);
       }
       try {
         registry.register(mod.moduleId, fm);
       } catch (err) {
+        if (errorMode === 'collect') {
+          results.push(createWriteResult(mod.moduleId, null, false, err instanceof Error ? err.message : String(err)));
+          continue;
+        }
         throw new WriteError(mod.moduleId, err);
       }
 
@@ -70,9 +79,13 @@ export class RegistryWriter {
   }
 
   private async _toFunctionModule(mod: ScannedModule, allowedPrefixes?: string[]): Promise<FunctionModule> {
-    const targetFn = (await resolveTarget(mod.target, allowedPrefixes)) as (
-      inputs: Record<string, unknown>,
-    ) => unknown;
+    const resolved = await resolveTarget(mod.target, allowedPrefixes);
+    if (typeof resolved !== 'function') {
+      throw new Error(
+        `Target "${mod.target}" resolved to ${typeof resolved}, expected a function.`,
+      );
+    }
+    const targetFn = resolved as (inputs: Record<string, unknown>) => unknown;
 
     return new FunctionModule({
       execute: async (inputs: Record<string, unknown>, _context: Context) => {

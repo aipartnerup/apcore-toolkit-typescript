@@ -12,6 +12,7 @@ export function resolveRef(
   const parts = refString.slice(2).split("/").map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
   let current: unknown = openapiDoc;
   for (const part of parts) {
+    if (PROTO_DENY_LIST.has(part)) return {};
     if (typeof current !== "object" || current === null || Array.isArray(current)) {
       return {};
     }
@@ -105,7 +106,16 @@ export function extractInputSchema(
     required: string[];
   } = { type: "object", properties: {}, required: [] };
 
-  const parameters = (operation["parameters"] ?? []) as Record<string, unknown>[];
+  const rawParameters = operation["parameters"] ?? [];
+  if (!Array.isArray(rawParameters)) {
+    console.warn('extractInputSchema: operation.parameters is not an array — ignoring');
+  }
+  const parameters = Array.isArray(rawParameters)
+    ? (rawParameters as unknown[]).filter(
+        (p): p is Record<string, unknown> =>
+          typeof p === 'object' && p !== null && !Array.isArray(p),
+      )
+    : [];
   for (const param of parameters) {
     if (param["in"] === "query" || param["in"] === "path") {
       const name = param["name"] as string;

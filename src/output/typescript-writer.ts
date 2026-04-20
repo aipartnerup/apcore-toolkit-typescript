@@ -31,6 +31,7 @@ export class TypeScriptWriter {
     const errorMode = options?.errorMode ?? 'throw';
     const results: WriteResult[] = [];
     const timestamp = new Date().toISOString();
+    const writtenIds = new Map<string, string>(); // filename → moduleId that claimed it
 
     const resolvedOut = dryRun ? '' : resolve(outputDir);
 
@@ -71,6 +72,16 @@ export class TypeScriptWriter {
       const sanitized = this._sanitizeIdentifier(mod.moduleId);
       const filename = `${sanitized}.ts`;
       const filePath = resolve(join(realResolvedOut, filename));
+
+      if (writtenIds.has(filename)) {
+        console.warn(
+          'TypeScriptWriter: safeId collision — "%s" and "%s" both map to %s; overwriting',
+          writtenIds.get(filename),
+          mod.moduleId,
+          filename,
+        );
+      }
+      writtenIds.set(filename, mod.moduleId);
 
       // Block symlinks pre-created at the target path (TOCTOU mitigation).
       // lstatSync does not follow symlinks, so it detects symlinks directly.
@@ -163,6 +174,9 @@ export class TypeScriptWriter {
     let sanitized = name.replace(/[^a-zA-Z0-9_]/g, '_');
     if (/^[0-9]/.test(sanitized)) {
       sanitized = `_${sanitized}`;
+    }
+    if (sanitized.length === 0) {
+      sanitized = '_module';
     }
     return sanitized;
   }

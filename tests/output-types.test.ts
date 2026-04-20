@@ -216,11 +216,8 @@ describe('JSONVerifier', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('warns (does not throw) at construction when schema is provided', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(() => new JSONVerifier({ type: 'object' })).not.toThrow();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not yet implemented'));
-    warnSpy.mockRestore();
+  it('throws at construction when schema is provided (schema validation not yet implemented)', () => {
+    expect(() => new JSONVerifier({ type: 'object' })).toThrow('not yet implemented');
   });
 });
 

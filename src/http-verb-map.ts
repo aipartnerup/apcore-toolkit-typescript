@@ -49,6 +49,7 @@ const PATH_PARAM_FULL_RE = new RegExp(`^(?:${_PATH_PARAM_CORE})$`);
  * @returns True if the path contains at least one path parameter, false otherwise.
  */
 export function hasPathParams(path: string): boolean {
+  if (typeof path !== 'string') return false;
   return PATH_PARAM_RE.test(path);
 }
 
@@ -64,14 +65,17 @@ export function hasPathParams(path: string): boolean {
  * @param pathHasParams - True if the corresponding route has path parameters.
  * @returns Semantic verb string (e.g., `"create"`, `"list"`, `"get"`).
  */
+const _PROTO_DENY = new Set(['__proto__', 'constructor', 'prototype']);
+
 export function resolveHttpVerb(method: string, pathHasParams: boolean): string {
   if (typeof method !== 'string') return 'unknown';
   const methodUpper = method.toUpperCase();
   if (methodUpper === 'GET') {
     const key = pathHasParams ? 'GET_ID' : 'GET';
-    return SCANNER_VERB_MAP[key] ?? method.toLowerCase();
+    return Object.hasOwn(SCANNER_VERB_MAP, key) ? SCANNER_VERB_MAP[key] : method.toLowerCase();
   }
-  return SCANNER_VERB_MAP[methodUpper] ?? method.toLowerCase();
+  if (_PROTO_DENY.has(methodUpper)) return method.toLowerCase();
+  return Object.hasOwn(SCANNER_VERB_MAP, methodUpper) ? SCANNER_VERB_MAP[methodUpper] : method.toLowerCase();
 }
 
 /**

@@ -94,6 +94,7 @@ export abstract class BaseScanner {
   }
 
   static inferAnnotationsFromMethod(method: string): ModuleAnnotations {
+    if (typeof method !== 'string') return { ...DEFAULT_ANNOTATIONS };
     const upper = method.toUpperCase();
 
     if (upper === 'GET') {

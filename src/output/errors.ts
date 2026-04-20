@@ -7,7 +7,7 @@ export class InvalidFormatError extends Error {
 
 export class WriteError extends Error {
   readonly path: string;
-  declare override readonly cause: unknown;
+  declare readonly cause: unknown;
 
   constructor(path: string, cause: unknown) {
     const message = cause instanceof Error ? cause.message : String(cause);

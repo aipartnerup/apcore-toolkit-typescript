@@ -36,7 +36,7 @@ export class YAMLVerifier implements Verifier {
       }
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: `YAML parse error: ${(err as Error).message}` };
+      return { ok: false, error: `YAML parse error: ${(err as Error).message}`, cause: err };
     }
   }
 }
@@ -86,7 +86,7 @@ export class SyntaxVerifier implements Verifier {
       }
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: `Read error: ${(err as Error).message}` };
+      return { ok: false, error: `Read error: ${(err as Error).message}`, cause: err };
     }
   }
 }
@@ -109,7 +109,7 @@ export class RegistryVerifier implements Verifier {
       }
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: `Registry lookup error: ${(err as Error).message}` };
+      return { ok: false, error: `Registry lookup error: ${(err as Error).message}`, cause: err };
     }
   }
 }
@@ -135,7 +135,7 @@ export class MagicBytesVerifier implements Verifier {
       return { ok: true };
     } catch (err) {
       if (fd !== undefined) { try { closeSync(fd); } catch { /* ignore */ } }
-      return { ok: false, error: `Read error: ${(err as Error).message}` };
+      return { ok: false, error: `Read error: ${(err as Error).message}`, cause: err };
     }
   }
 }
@@ -143,9 +143,10 @@ export class MagicBytesVerifier implements Verifier {
 export class JSONVerifier implements Verifier {
   constructor(schema?: Record<string, unknown>) {
     if (schema != null) {
-      console.warn(
-        'JSONVerifier: schema validation is not yet implemented — schema argument is ignored. ' +
-          'Install ajv and update JSONVerifier.verify() to enable schema validation.',
+      throw new Error(
+        'JSONVerifier: schema validation is not yet implemented. ' +
+          'Install ajv and update JSONVerifier.verify() to enable schema validation, ' +
+          'or construct JSONVerifier without a schema argument for syntax-only checking.',
       );
     }
   }
@@ -155,13 +156,13 @@ export class JSONVerifier implements Verifier {
     try {
       content = readFileSync(path, 'utf-8');
     } catch (err) {
-      return { ok: false, error: `Read error: ${(err as Error).message}` };
+      return { ok: false, error: `Read error: ${(err as Error).message}`, cause: err };
     }
     try {
       JSON.parse(content);
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: `JSON parse error: ${(err as Error).message}` };
+      return { ok: false, error: `JSON parse error: ${(err as Error).message}`, cause: err };
     }
   }
 }
