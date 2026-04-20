@@ -213,6 +213,36 @@ describe('toMarkdown', () => {
     expect(result).toBe('# My Report\n\n- **a**: 1\n');
   });
 
+  // C1 regression: _filterKeys prototype-chain walk via 'fields'
+  it('fields option: does not include prototype-inherited keys (e.g. toString)', () => {
+    const data = { a: 1, b: 2 };
+    // 'toString' is an inherited property, not own — should be silently skipped
+    const result = toMarkdown(data, { fields: ['toString'] });
+    expect(result).toBe('\n');
+    expect(result).not.toContain('toString');
+  });
+
+  // C4 regression: newlines in table cell values break the Markdown table
+  it('escapes newlines in scalar-dict table cell values', () => {
+    const data = { a: 'line1\nline2', b: '2', c: '3', d: '4', e: '5' };
+    const result = toMarkdown(data, { tableThreshold: 5 });
+    const lines = result.split('\n');
+    const tableLines = lines.filter(l => l.startsWith('|'));
+    // No table cell should contain a raw newline (each row must be on one line)
+    expect(tableLines.every(l => !l.includes('\n'))).toBe(true);
+    expect(result).toContain('line1 line2');
+  });
+
+  it('escapes newlines in list-table cell values', () => {
+    const result = toMarkdown({
+      items: [
+        { name: 'a\nb', val: 1 },
+        { name: 'c', val: 2 },
+      ],
+    });
+    expect(result).toContain('| a b | 1 |');
+  });
+
   // 14. Pipe characters escaped in table cells
   it('escapes pipe characters in table cells', () => {
     const data = { a: 'x|y', b: 'z', c: 'w', d: 'v', e: 'u' };

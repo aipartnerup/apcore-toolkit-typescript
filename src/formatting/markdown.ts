@@ -20,6 +20,10 @@ function _escapePipe(text: string): string {
   return text.replace(/\|/g, '\\|');
 }
 
+function _escapeCell(text: string): string {
+  return _escapePipe(text).replace(/\r?\n/g, ' ');
+}
+
 function _compactRepr(value: unknown, maxLen = 80, _visited?: WeakSet<object>): string {
   const visited = _visited ?? new WeakSet<object>();
   let text: string;
@@ -64,7 +68,7 @@ function _filterKeys(
   if (fields !== undefined) {
     const filtered: Record<string, unknown> = {};
     for (const k of fields) {
-      if (k in data) {
+      if (Object.prototype.hasOwnProperty.call(data, k)) {
         filtered[k] = data[k];
       }
     }
@@ -85,7 +89,7 @@ function _renderTable(data: Record<string, unknown>, lines: string[]): void {
   lines.push('| Field | Value |');
   lines.push('|-------|-------|');
   for (const [key, value] of Object.entries(data)) {
-    lines.push(`| ${_escapePipe(String(key))} | ${_escapePipe(_formatScalar(value))} |`);
+    lines.push(`| ${_escapeCell(String(key))} | ${_escapeCell(_formatScalar(value))} |`);
   }
   lines.push('');
 }
@@ -104,7 +108,7 @@ function _renderListTable(
   lines.push('| ' + keys.map(k => _escapePipe(k)).join(' | ') + ' |');
   lines.push('| ' + keys.map(() => '---').join(' | ') + ' |');
   for (const item of items) {
-    const row = keys.map(k => _escapePipe(_formatScalar(item[k]))).join(' | ');
+    const row = keys.map(k => _escapeCell(_formatScalar(item[k]))).join(' | ');
     lines.push(`| ${row} |`);
   }
   lines.push('');
@@ -175,26 +179,19 @@ function _renderDict(
   tableThreshold: number,
   exclude?: string[],
 ): void {
-  if (Object.keys(data).length === 0) return;
+  const ex = exclude && exclude.length > 0 ? new Set(exclude) : null;
+  const entries = Object.entries(data).filter(([k]) => !ex || !ex.has(k));
+  if (entries.length === 0) return;
 
-  if (exclude && exclude.length > 0) {
-    const ex = new Set(exclude);
-    const filtered: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(data)) {
-      if (!ex.has(k)) filtered[k] = v;
-    }
-    data = filtered;
-  }
-
-  const allScalar = Object.values(data).every(v => _isScalar(v));
-  if (allScalar && Object.keys(data).length >= tableThreshold) {
-    _renderTable(data, lines);
+  const allScalar = entries.every(([, v]) => _isScalar(v));
+  if (allScalar && entries.length >= tableThreshold) {
+    _renderTable(Object.fromEntries(entries), lines);
     return;
   }
 
   const indent = '  '.repeat(depth);
 
-  for (const [key, value] of Object.entries(data)) {
+  for (const [key, value] of entries) {
     if (_isScalar(value)) {
       lines.push(`${indent}- **${key}**: ${_formatScalar(value)}`);
     } else if (Array.isArray(value)) {
