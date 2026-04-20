@@ -120,7 +120,12 @@ export class DisplayResolver {
     // Use Object.create(null) so that user-controlled keys like '__proto__'
     // cannot pollute Object.prototype.
     if ('bindings' in data) {
-      const bindings = (data['bindings'] as Array<Record<string, unknown>>) ?? [];
+      const rawBindings = data['bindings'];
+      if (!Array.isArray(rawBindings)) {
+        console.warn('DisplayResolver: bindings must be an array, got', typeof rawBindings);
+        return Object.create(null) as BindingMap;
+      }
+      const bindings = rawBindings as Array<Record<string, unknown>>;
       const result: BindingMap = Object.create(null) as BindingMap;
       for (const entry of bindings) {
         const id = entry['module_id'] as string | undefined;
@@ -142,7 +147,7 @@ export class DisplayResolver {
   }
 
   private _loadBindingFiles(bindingPath: string): BindingMap {
-    const result: BindingMap = {};
+    const result: BindingMap = Object.create(null) as BindingMap;
 
     let files: string[] = [];
     try {
@@ -162,6 +167,16 @@ export class DisplayResolver {
     }
 
     for (const f of files) {
+      try {
+        const lstat = fs.lstatSync(f);
+        if (lstat.isSymbolicLink()) {
+          console.warn(`DisplayResolver: skipping symlink ${f}`);
+          continue;
+        }
+      } catch (exc) {
+        console.warn(`DisplayResolver: failed to stat ${f}: ${exc}`);
+        continue;
+      }
       let content: string;
       try {
         content = fs.readFileSync(f, 'utf-8');

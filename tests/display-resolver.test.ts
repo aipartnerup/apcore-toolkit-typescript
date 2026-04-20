@@ -749,6 +749,57 @@ describe('DisplayResolver', () => {
     });
   });
 
+  // W1 regression: bindings value that is not an array causes TypeError
+  describe('_parseBindingData — non-array bindings', () => {
+    it('does not throw when bindings is a string', () => {
+      const resolver = new DisplayResolver();
+      const m = mod({ moduleId: 'test.mod' });
+      const bindingData = { bindings: 'not-an-array' } as unknown as Record<string, unknown>;
+      expect(() => resolver.resolve([m], { bindingData })).not.toThrow();
+    });
+
+    it('does not throw when bindings is an object', () => {
+      const resolver = new DisplayResolver();
+      const m = mod({ moduleId: 'test.mod' });
+      const bindingData = { bindings: { foo: 'bar' } } as unknown as Record<string, unknown>;
+      expect(() => resolver.resolve([m], { bindingData })).not.toThrow();
+    });
+  });
+
+  // C5 regression: _loadBindingFiles must use null-prototype result object
+  describe('_loadBindingFiles — null-prototype result', () => {
+    it('does not pollute Object.prototype when binding file has __proto__ module_id', () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dr-c5-'));
+      const f = path.join(tmpDir, 'test.binding.yaml');
+      fs.writeFileSync(f, 'bindings:\n  - module_id: __proto__\n    display:\n      alias: evil\n');
+      const resolver = new DisplayResolver();
+      const m = mod({ moduleId: 'safe.mod' });
+      resolver.resolve([m], { bindingPath: tmpDir });
+      expect(({} as Record<string, unknown>).alias).toBeUndefined();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+  });
+
+  // C6 regression: _loadBindingFiles must skip symlinks
+  describe('_loadBindingFiles — symlink guard', () => {
+    it('skips binding files that are symlinks', () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dr-c6-'));
+      const realFile = path.join(tmpDir, 'real.binding.yaml');
+      const linkFile = path.join(tmpDir, 'linked.binding.yaml');
+      fs.writeFileSync(realFile, 'bindings:\n  - module_id: test.mod\n    display:\n      alias: safe\n');
+      fs.symlinkSync(realFile, linkFile);
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const resolver = new DisplayResolver();
+      const m = mod({ moduleId: 'test.mod' });
+      resolver.resolve([m], { bindingPath: tmpDir });
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('symlink'));
+      warnSpy.mockRestore();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+  });
+
   // Split IO/parse error regression (D8-display)
   describe('_loadBindingFiles — separate IO vs parse error messages', () => {
     it('warns with "failed to read" for missing file in directory', () => {
