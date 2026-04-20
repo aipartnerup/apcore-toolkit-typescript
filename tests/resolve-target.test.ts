@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolveTarget } from "../src/resolve-target";
 
 describe("resolveTarget", () => {
@@ -48,5 +51,23 @@ describe("resolveTarget", () => {
     await expect(
       resolveTarget("/foobar/secret.js:default", ["/foo"]),
     ).rejects.toThrow("not under any allowed prefix");
+  });
+
+  it("rejects a symlink inside an allowed prefix that points outside (D2-4 regression)", async () => {
+    const safeDir = mkdtempSync(join(tmpdir(), "resolve-safe-"));
+    const dangerDir = mkdtempSync(join(tmpdir(), "resolve-danger-"));
+    const dangerFile = join(dangerDir, "secret.mjs");
+    writeFileSync(dangerFile, "export default 42;\n", "utf-8");
+    const symlink = join(safeDir, "link.mjs");
+    symlinkSync(dangerFile, symlink);
+
+    try {
+      await expect(
+        resolveTarget(`${symlink}:default`, [safeDir]),
+      ).rejects.toThrow("not under any allowed prefix");
+    } finally {
+      rmSync(safeDir, { recursive: true, force: true });
+      rmSync(dangerDir, { recursive: true, force: true });
+    }
   });
 });

@@ -1,4 +1,5 @@
 import { resolve, isAbsolute, sep } from 'node:path';
+import { realpathSync } from 'node:fs';
 
 /**
  * Dynamically imports a module and resolves a named export.
@@ -30,9 +31,11 @@ export async function resolveTarget(
   // Validate file-path imports against allowedPrefixes
   const isFilePath = modulePath.startsWith('.') || isAbsolute(modulePath);
   if (isFilePath && allowedPrefixes != null && allowedPrefixes.length > 0) {
-    const resolved = resolve(modulePath);
+    let resolved = resolve(modulePath);
+    try { resolved = realpathSync(resolved); } catch { /* path may not exist yet; keep logical resolve */ }
     const allowed = allowedPrefixes.some((prefix) => {
-      const resolvedPrefix = resolve(prefix);
+      let resolvedPrefix = resolve(prefix);
+      try { resolvedPrefix = realpathSync(resolvedPrefix); } catch { /* keep logical resolve */ }
       return resolved === resolvedPrefix || resolved.startsWith(resolvedPrefix + sep);
     });
     if (!allowed) {
