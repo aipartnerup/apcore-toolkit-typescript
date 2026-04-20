@@ -175,12 +175,16 @@ export class AIEnhancer {
 
     for (let batchStart = 0; batchStart < pending.length; batchStart += this.batchSize) {
       const batch = pending.slice(batchStart, batchStart + this.batchSize);
-      for (const { idx, module, gaps } of batch) {
-        try {
-          const enhanced = await this._enhanceModule(module, gaps);
-          results[idx] = enhanced;
-        } catch (err) {
-          console.warn('AIEnhancer: enhancement failed for %s:', module.moduleId, err);
+      const settled = await Promise.allSettled(
+        batch.map(({ module, gaps }) => this._enhanceModule(module, gaps)),
+      );
+      for (let i = 0; i < batch.length; i++) {
+        const { idx, module } = batch[i];
+        const outcome = settled[i];
+        if (outcome.status === 'fulfilled') {
+          results[idx] = outcome.value;
+        } else {
+          console.warn('AIEnhancer: enhancement failed for %s:', module.moduleId, outcome.reason);
         }
       }
     }
@@ -230,7 +234,15 @@ export class AIEnhancer {
     const parsed = AIEnhancer._parseResponse(response);
 
     const updates: Record<string, unknown> = {};
-    const parsedConf = (parsed.confidence ?? {}) as Record<string, number>;
+    // Build parsedConf from a null-prototype object so attacker-controlled
+    // keys like '__proto__' cannot affect prototype lookups.
+    const rawConf = parsed.confidence;
+    const parsedConf: Record<string, number> = Object.create(null) as Record<string, number>;
+    if (rawConf !== null && typeof rawConf === 'object' && !Array.isArray(rawConf)) {
+      for (const [k, v] of Object.entries(rawConf as Record<string, unknown>)) {
+        if (typeof v === 'number' && Number.isFinite(v)) parsedConf[k] = v;
+      }
+    }
     const confidence: Record<string, number> = {};
     const warnings: string[] = [...module.warnings];
 

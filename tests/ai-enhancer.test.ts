@@ -288,6 +288,33 @@ describe('AIEnhancer', () => {
     });
   });
 
+  describe('parsedConf Pattern A regression', () => {
+    it('confidence with non-numeric values does not pollute and is safely ignored', async () => {
+      process.env.APCORE_AI_ENABLED = 'true';
+      const mod = createScannedModule({
+        moduleId: 'proto.test',
+        description: 'proto.test',
+        inputSchema: { type: 'object' },
+        outputSchema: { type: 'object' },
+        tags: [],
+        target: 'mod:fn',
+      });
+      const enhancer = new AIEnhancer();
+      // Spy on _callLLM to return a malicious confidence object
+      const callLLM = vi.spyOn(enhancer as unknown as { _callLLM: (p: string) => Promise<string> }, '_callLLM');
+      callLLM.mockResolvedValueOnce(
+        JSON.stringify({
+          description: 'A module',
+          confidence: { description: 'not-a-number', __proto__: 1.0 },
+        }),
+      );
+      const result = await enhancer.enhance([mod]);
+      // __proto__ as a confidence key must not affect behavior
+      expect(result).toHaveLength(1);
+      callLLM.mockRestore();
+    });
+  });
+
   // _parseResponse fence-stripping regression
   describe('_parseResponse fence stripping', () => {
     const parse = (AIEnhancer as unknown as { _parseResponse: (r: string) => Record<string, unknown> })._parseResponse.bind(AIEnhancer);

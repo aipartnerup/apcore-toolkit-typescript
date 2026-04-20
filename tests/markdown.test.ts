@@ -352,4 +352,14 @@ describe('toMarkdown', () => {
     const result = toMarkdown(a);
     expect(result).toContain('[Circular]');
   });
+
+  it('fields with __proto__ key does not corrupt prototype chain (Pattern A regression)', () => {
+    const data = { a: 1, b: 2 };
+    // Even when __proto__ appears in fields, the output must be correct and Object.prototype unchanged
+    const result = toMarkdown(data, { fields: ['__proto__', 'a'] });
+    // Only 'a' exists in data, so only 'a' appears
+    expect(result).toContain('**a**: 1');
+    // Object.prototype must not be poisoned
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+  });
 });

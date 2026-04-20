@@ -66,7 +66,7 @@ function _filterKeys(
 ): Record<string, unknown> {
   let result = data;
   if (fields !== undefined) {
-    const filtered: Record<string, unknown> = {};
+    const filtered: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const k of fields) {
       if (Object.prototype.hasOwnProperty.call(data, k)) {
         filtered[k] = data[k];
@@ -76,7 +76,7 @@ function _filterKeys(
   }
   if (exclude && exclude.length > 0) {
     const ex = new Set(exclude);
-    const filtered: Record<string, unknown> = {};
+    const filtered: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const [k, v] of Object.entries(result)) {
       if (!ex.has(k)) filtered[k] = v;
     }
