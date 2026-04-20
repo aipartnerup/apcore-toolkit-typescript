@@ -135,6 +135,16 @@ export class AIEnhancer {
     this.batchSize = options?.batchSize ?? parseIntEnv('APCORE_AI_BATCH_SIZE', _DEFAULT_BATCH_SIZE);
     this.timeout = options?.timeout ?? parseIntEnv('APCORE_AI_TIMEOUT', _DEFAULT_TIMEOUT);
 
+    try {
+      const parsed = new URL(this.endpoint);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error(`AIEnhancer endpoint must use http: or https: protocol, got "${parsed.protocol}"`);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('AIEnhancer endpoint')) throw err;
+      throw new Error(`AIEnhancer endpoint is not a valid URL: ${this.endpoint}`, { cause: err });
+    }
+
     if (this.threshold < 0 || this.threshold > 1) {
       throw new Error('APCORE_AI_THRESHOLD must be a number between 0.0 and 1.0');
     }
@@ -170,11 +180,7 @@ export class AIEnhancer {
           const enhanced = await this._enhanceModule(module, gaps);
           results[idx] = enhanced;
         } catch (err) {
-          console.warn(
-            'AIEnhancer: enhancement failed for %s: %s',
-            module.moduleId,
-            err instanceof Error ? err.message : String(err),
-          );
+          console.warn('AIEnhancer: enhancement failed for %s:', module.moduleId, err);
         }
       }
     }
@@ -338,7 +344,9 @@ export class AIEnhancer {
     // Build confidence keys dynamically from all annotation fields so the
     // prompt stays in sync as DEFAULT_ANNOTATIONS evolves upstream.
     const confidenceKeys = Object.fromEntries(
-      Object.keys(DEFAULT_ANNOTATIONS).map(k => [camelToSnake(k), 0.0])
+      Object.keys(DEFAULT_ANNOTATIONS)
+        .filter(k => k !== 'extra')
+        .map(k => [camelToSnake(k), 0.0])
     );
     const confidenceKeysJson = JSON.stringify(confidenceKeys, null, 4)
       .split('\n')
@@ -383,7 +391,7 @@ export class AIEnhancer {
       return choices[0].message.content;
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        throw new Error(`SLM request timed out after ${this.timeout}s`);
+        throw new Error(`SLM request timed out after ${this.timeout}s`, { cause: err });
       }
       throw err;
     } finally {
@@ -410,7 +418,7 @@ export class AIEnhancer {
     try {
       return JSON.parse(text) as Record<string, unknown>;
     } catch (err) {
-      throw new Error(`SLM returned invalid JSON: ${(err as Error).message}`);
+      throw new Error(`SLM returned invalid JSON: ${(err as Error).message}`, { cause: err });
     }
   }
 }

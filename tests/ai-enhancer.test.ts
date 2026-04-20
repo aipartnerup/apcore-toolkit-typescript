@@ -70,7 +70,7 @@ describe('AIEnhancer', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('AIEnhancer'),
         expect.stringContaining('fail.module'),
-        expect.stringContaining('SLM unreachable'),
+        expect.objectContaining({ message: 'SLM unreachable' }),
       );
 
       callLLM.mockRestore();
