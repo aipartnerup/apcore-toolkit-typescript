@@ -1,5 +1,5 @@
 import { writeFileSync, mkdirSync, realpathSync, lstatSync, renameSync, unlinkSync } from 'node:fs';
-import { resolve, join, sep } from 'node:path';
+import { resolve, join, sep, isAbsolute } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import type { WriteResult } from './types.js';
 import { createWriteResult } from './types.js';
@@ -70,18 +70,24 @@ export class TypeScriptWriter {
       }
 
       const sanitized = this._sanitizeIdentifier(mod.moduleId);
-      const filename = `${sanitized}.ts`;
-      const filePath = resolve(join(realResolvedOut, filename));
-
-      if (writtenIds.has(filename)) {
+      const baseFilename = `${sanitized}.ts`;
+      let filename = baseFilename;
+      let collisionCounter = 0;
+      while (writtenIds.has(filename)) {
+        collisionCounter++;
+        filename = `${sanitized}_${collisionCounter}.ts`;
+      }
+      if (collisionCounter > 0) {
         console.warn(
-          'TypeScriptWriter: safeId collision — "%s" and "%s" both map to %s; overwriting',
-          writtenIds.get(filename),
+          'TypeScriptWriter: safeId collision — "%s" and "%s" both map to %s; using %s',
+          writtenIds.get(baseFilename),
           mod.moduleId,
+          baseFilename,
           filename,
         );
       }
       writtenIds.set(filename, mod.moduleId);
+      const filePath = resolve(join(realResolvedOut, filename));
 
       // Block symlinks pre-created at the target path (TOCTOU mitigation).
       // lstatSync does not follow symlinks, so it detects symlinks directly.
@@ -99,6 +105,12 @@ export class TypeScriptWriter {
       try {
         writeFileSync(tmpPath, code, 'utf-8');
         renameSync(tmpPath, filePath);
+        // Post-rename sanity check: verify the result is not a symlink (defence-in-depth).
+        try {
+          if (lstatSync(filePath).isSymbolicLink()) {
+            console.warn('TypeScriptWriter: post-rename symlink detected at %s — possible race', filePath);
+          }
+        } catch { /* lstat failing here is non-critical */ }
       } catch (err) {
         try { unlinkSync(tmpPath); } catch { /* best-effort cleanup */ }
         if (errorMode === 'collect') {
@@ -164,10 +176,15 @@ export class TypeScriptWriter {
     if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(exportName)) {
       throw new Error(`Invalid export name: ${exportName}`);
     }
-    return {
-      modulePath: target.slice(0, lastColon),
-      exportName,
-    };
+    const modulePath = target.slice(0, lastColon);
+    if (isAbsolute(modulePath)) {
+      throw new Error(`TypeScriptWriter: absolute module path not allowed in target: ${modulePath}`);
+    }
+    const segments = modulePath.split('/');
+    if (segments.some((seg) => seg === '..')) {
+      throw new Error(`TypeScriptWriter: parent traversal in module path not allowed: ${modulePath}`);
+    }
+    return { modulePath, exportName };
   }
 
   private _sanitizeIdentifier(name: string): string {

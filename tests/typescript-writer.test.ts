@@ -130,6 +130,33 @@ describe('TypeScriptWriter', () => {
     expect(path.basename(finalPath)).toBe('weird_id_test.ts');
   });
 
+  it('throws for absolute modulePath in target (D2 sandbox bypass regression)', () => {
+    const mod = makeModule({ target: '/etc/passwd:secret' });
+    expect(() => writer.write([mod], '/tmp/out', { dryRun: true })).toThrow(
+      /absolute module path/,
+    );
+  });
+
+  it('throws for parent-traversal modulePath in target (D2 sandbox bypass regression)', () => {
+    const mod = makeModule({ target: '../../outside:fn' });
+    expect(() => writer.write([mod], '/tmp/out', { dryRun: true })).toThrow(
+      /parent traversal/,
+    );
+  });
+
+  it('de-duplicates filename collision instead of overwriting (W14-parity regression)', () => {
+    // 'foo.bar' and 'foo_bar' both sanitize to 'foo_bar.ts' — second must get a suffix
+    const mod1 = makeModule({ moduleId: 'foo.bar', target: 'myapp/a:fn' });
+    const mod2 = makeModule({ moduleId: 'foo_bar', target: 'myapp/b:fn' });
+    writer.write([mod1, mod2], '/tmp/out');
+
+    const renames = (fs.renameSync as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call: unknown[]) => path.basename(call[1] as string),
+    );
+    const uniqueNames = new Set(renames);
+    expect(uniqueNames.size).toBe(2); // both get distinct filenames
+  });
+
   it('throws for invalid target without ":"', () => {
     const mod = makeModule({ target: 'invalid_target_no_colon' });
     expect(() => writer.write([mod], '/tmp/out', { dryRun: true })).toThrow(
