@@ -32,7 +32,7 @@ export function applyVerification(
       return createWriteResult(moduleId, path, false, builtinResult.error ?? null);
     }
   }
-  if (result.verified && verifiers.length > 0) {
+  if (verify && verifiers.length > 0) {
     const vResult = runVerifierChain(verifiers, path, moduleId);
     if (!vResult.ok) {
       return createWriteResult(moduleId, path, false, vResult.error ?? null);

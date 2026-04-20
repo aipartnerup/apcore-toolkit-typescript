@@ -26,9 +26,17 @@ describe('applyVerification', () => {
     expect(out.verificationError).toBe('failed');
   });
 
-  it('runs custom verifier chain when verify=false but verifiers provided', () => {
+  it('skips custom verifier chain when verify=false (verify flag gates all verification)', () => {
     const result = createWriteResult('mod', '/tmp/f');
     const out = applyVerification(result, passVerifier, [failVerifier], '/tmp/f', 'mod', false);
+    // verify=false means NO verification — custom verifiers must not run
+    expect(out.verified).toBe(true);
+    expect(out.verificationError).toBeNull();
+  });
+
+  it('runs custom verifier chain when verify=true and builtin passes', () => {
+    const result = createWriteResult('mod', '/tmp/f');
+    const out = applyVerification(result, passVerifier, [failVerifier], '/tmp/f', 'mod', true);
     expect(out.verified).toBe(false);
     expect(out.verificationError).toBe('failed');
   });
@@ -41,11 +49,11 @@ describe('applyVerification', () => {
     expect(customCalled).toBe(false);
   });
 
-  it('returns first failure from custom verifier chain', () => {
+  it('returns first failure from custom verifier chain when verify=true', () => {
     const v1: Verifier = { verify: () => ({ ok: false, error: 'first' }) };
     const v2: Verifier = { verify: () => ({ ok: false, error: 'second' }) };
     const result = createWriteResult('mod', '/tmp/f');
-    const out = applyVerification(result, passVerifier, [v1, v2], '/tmp/f', 'mod', false);
+    const out = applyVerification(result, passVerifier, [v1, v2], '/tmp/f', 'mod', true);
     expect(out.verificationError).toBe('first');
   });
 });

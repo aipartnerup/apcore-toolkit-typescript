@@ -58,7 +58,6 @@ export class YAMLWriter {
         throw new WriteError(outputPath, err);
       }
     }
-    const normalizedOutput = realOutputPath.endsWith(sep) ? realOutputPath : realOutputPath + sep;
 
     const results: WriteResult[] = [];
     const timestamp = new Date().toISOString();
@@ -74,21 +73,26 @@ export class YAMLWriter {
 
       let safeId = module.moduleId.replace(/[^a-zA-Z0-9._-]/g, '_');
       safeId = safeId.replace(/\.{2,}/g, '_');
-      const filename = `${safeId}.binding.yaml`;
-      // Build filePath from the real (symlink-resolved) output dir so the
-      // prefix check below compares canonical paths on both sides.
-      const filePath = resolve(join(realOutputPath, filename));
-
-      // Warn if this filename was already claimed by another module in this batch.
-      if (writtenIds.has(filename)) {
+      const baseFilename = `${safeId}.binding.yaml`;
+      let filename = baseFilename;
+      let collisionCounter = 0;
+      while (writtenIds.has(filename)) {
+        collisionCounter++;
+        filename = `${safeId}_${collisionCounter}.binding.yaml`;
+      }
+      if (collisionCounter > 0) {
         console.warn(
-          'YAMLWriter: safeId collision — "%s" and "%s" both map to %s; overwriting',
-          writtenIds.get(filename),
+          'YAMLWriter: safeId collision — "%s" and "%s" both map to %s; using %s',
+          writtenIds.get(baseFilename),
           module.moduleId,
+          baseFilename,
           filename,
         );
       }
       writtenIds.set(filename, module.moduleId);
+      // Build filePath from the real (symlink-resolved) output dir so the
+      // prefix check below compares canonical paths on both sides.
+      const filePath = resolve(join(realOutputPath, filename));
 
       // Block pre-existing symlinks at the target path (TOCTOU mitigation).
       try {
@@ -114,6 +118,12 @@ export class YAMLWriter {
       try {
         writeFileSync(tmpPath, header + yamlContent, 'utf-8');
         renameSync(tmpPath, filePath);
+        // Post-rename sanity check: verify the result is not a symlink (defence-in-depth).
+        try {
+          if (lstatSync(filePath).isSymbolicLink()) {
+            console.warn('YAMLWriter: post-rename symlink detected at %s — possible race', filePath);
+          }
+        } catch { /* lstat failing here is non-critical */ }
       } catch (err) {
         try { unlinkSync(tmpPath); } catch { /* best-effort cleanup */ }
         if (errorMode === 'collect') {

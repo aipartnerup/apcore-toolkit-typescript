@@ -31,7 +31,9 @@ export class YAMLVerifier implements Verifier {
       for (let i = 0; i < bindings.length; i++) {
         const entry = bindings[i] as Record<string, unknown>;
         for (const field of ['module_id', 'target'] as const) {
-          if (!entry[field]) return { ok: false, error: `Missing required field '${field}' in binding[${i}]` };
+          if (typeof entry[field] !== 'string' || entry[field] === '') {
+            return { ok: false, error: `Missing or empty required field '${field}' in binding[${i}]` };
+          }
         }
       }
       return { ok: true };
@@ -127,15 +129,14 @@ export class MagicBytesVerifier implements Verifier {
       fd = openSync(path, 'r');
       const buf = Buffer.alloc(this.expected.length);
       const bytesRead = readSync(fd, buf, 0, this.expected.length, 0);
-      closeSync(fd);
-      fd = undefined;
       if (bytesRead < this.expected.length || !buf.equals(this.expected)) {
         return { ok: false, error: 'File header does not match expected magic bytes' };
       }
       return { ok: true };
     } catch (err) {
-      if (fd !== undefined) { try { closeSync(fd); } catch { /* ignore */ } }
       return { ok: false, error: `Read error: ${(err as Error).message}`, cause: err };
+    } finally {
+      if (fd !== undefined) { try { closeSync(fd); } catch { /* ignore */ } }
     }
   }
 }
