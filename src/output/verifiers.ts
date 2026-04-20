@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import yaml from 'js-yaml';
 import type { Verifier, VerifyResult } from './types.js';
@@ -41,14 +41,15 @@ export class YAMLVerifier implements Verifier {
   }
 }
 
-function _flattenDiagnosticMessage(msg: unknown): string {
+function _flattenDiagnosticMessage(msg: unknown, depth = 0): string {
+  if (depth > 32) return '[...]';
   if (typeof msg === 'string') return msg;
   if (typeof msg === 'object' && msg !== null && 'messageText' in msg) {
     const chain = msg as { messageText: unknown; next?: unknown[] };
-    const parts = [_flattenDiagnosticMessage(chain.messageText)];
+    const parts = [_flattenDiagnosticMessage(chain.messageText, depth + 1)];
     if (Array.isArray(chain.next)) {
       for (const sub of chain.next) {
-        parts.push(_flattenDiagnosticMessage(sub));
+        parts.push(_flattenDiagnosticMessage(sub, depth + 1));
       }
     }
     return parts.join(': ');
@@ -121,14 +122,19 @@ export class MagicBytesVerifier implements Verifier {
   }
 
   verify(path: string, _moduleId: string): VerifyResult {
+    let fd: number | undefined;
     try {
-      const content = readFileSync(path);
-      const header = content.subarray(0, this.expected.length);
-      if (!header.equals(this.expected)) {
+      fd = openSync(path, 'r');
+      const buf = Buffer.alloc(this.expected.length);
+      const bytesRead = readSync(fd, buf, 0, this.expected.length, 0);
+      closeSync(fd);
+      fd = undefined;
+      if (bytesRead < this.expected.length || !buf.equals(this.expected)) {
         return { ok: false, error: 'File header does not match expected magic bytes' };
       }
       return { ok: true };
     } catch (err) {
+      if (fd !== undefined) { try { closeSync(fd); } catch { /* ignore */ } }
       return { ok: false, error: `Read error: ${(err as Error).message}` };
     }
   }
@@ -145,8 +151,13 @@ export class JSONVerifier implements Verifier {
   }
 
   verify(path: string, _moduleId: string): VerifyResult {
+    let content: string;
     try {
-      const content = readFileSync(path, 'utf-8');
+      content = readFileSync(path, 'utf-8');
+    } catch (err) {
+      return { ok: false, error: `Read error: ${(err as Error).message}` };
+    }
+    try {
       JSON.parse(content);
       return { ok: true };
     } catch (err) {
@@ -175,7 +186,9 @@ export function runVerifierChain(
       const result = verifier.verify(path, moduleId);
       if (!result.ok) return result;
     } catch (e) {
-      return { ok: false, error: `Verifier crashed: ${(e as Error).message}` };
+      const name = verifier.constructor?.name ?? 'UnknownVerifier';
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, error: `${name} crashed: ${msg}`, cause: e };
     }
   }
   return { ok: true };

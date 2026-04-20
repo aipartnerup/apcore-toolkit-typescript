@@ -8,6 +8,7 @@ export interface WriteResult {
 export interface VerifyResult {
   readonly ok: boolean;
   readonly error?: string;
+  readonly cause?: unknown;
 }
 
 export interface Verifier {

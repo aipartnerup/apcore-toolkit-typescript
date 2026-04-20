@@ -314,7 +314,7 @@ describe('runVerifierChain', () => {
 
     const result = runVerifierChain([throwingVerifier, passVerifier], '/tmp/x', 'test');
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/^Verifier crashed:/);
+    expect(result.error).toMatch(/crashed:/);
     expect(result.error).toContain('unexpected internal failure');
   });
 
