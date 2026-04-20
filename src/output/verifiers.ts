@@ -121,25 +121,18 @@ export class MagicBytesVerifier implements Verifier {
 }
 
 export class JSONVerifier implements Verifier {
-  private readonly schema: Record<string, unknown> | null;
-
   constructor(schema?: Record<string, unknown>) {
-    this.schema = schema ?? null;
+    if (schema != null) {
+      throw new Error(
+        'JSONVerifier: schema validation is not yet implemented — install ajv and update JSONVerifier.verify() before passing a schema.',
+      );
+    }
   }
 
   verify(path: string, _moduleId: string): VerifyResult {
     try {
       const content = readFileSync(path, 'utf-8');
       JSON.parse(content);
-      if (this.schema != null) {
-        // Schema validation requires ajv — the schema parameter was provided but
-        // cannot be validated without ajv installed.
-        return {
-          ok: false,
-          error:
-            'JSONVerifier schema validation not implemented — install ajv and update JSONVerifier.verify()',
-        };
-      }
       return { ok: true };
     } catch (err) {
       return { ok: false, error: `JSON parse error: ${(err as Error).message}` };

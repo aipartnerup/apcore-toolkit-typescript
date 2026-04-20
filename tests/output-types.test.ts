@@ -192,17 +192,8 @@ describe('JSONVerifier', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('returns error when schema is provided (validation not implemented without ajv)', () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), 'json-verifier-'));
-    const filePath = join(tmpDir, 'test.json');
-    writeFileSync(filePath, '{"key": "value"}', 'utf-8');
-
-    const verifier = new JSONVerifier({ type: 'object' });
-    const result = verifier.verify(filePath, 'test');
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('ajv');
-
-    rmSync(tmpDir, { recursive: true, force: true });
+  it('throws at construction when schema is provided (D8-3 regression)', () => {
+    expect(() => new JSONVerifier({ type: 'object' })).toThrow(/ajv/i);
   });
 });
 
