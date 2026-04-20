@@ -54,6 +54,14 @@
     "apcore-js": ">=0.19.0",
     "js-yaml": "^4.1.0"
   },
+  "peerDependencies": {
+    "@sinclair/typebox": ">=0.31.0"
+  },
+  "peerDependenciesMeta": {
+    "@sinclair/typebox": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
