@@ -184,3 +184,19 @@ describe('conformance fixture', () => {
     expect(result).toBe(c.expected_alias);
   });
 });
+
+// resolveHttpVerb GET fallback regression (D4-get-fallback)
+describe('resolveHttpVerb — GET branch fallback', () => {
+  it('returns "list" for GET without path params', () => {
+    expect(resolveHttpVerb('GET', false)).toBe('list');
+  });
+
+  it('returns "get" for GET with path params', () => {
+    expect(resolveHttpVerb('GET', true)).toBe('get');
+  });
+
+  it('falls back to lowercase method for unknown verbs', () => {
+    expect(resolveHttpVerb('CONNECT', false)).toBe('connect');
+    expect(resolveHttpVerb('TRACE', false)).toBe('trace');
+  });
+});

@@ -30,13 +30,14 @@ export const SCANNER_VERB_MAP: Readonly<Record<string, string>> = Object.freeze(
  *   FastAPI / Django / OpenAPI: {param}
  *   Express / NestJS / Gin / Axum: :param
  */
-const PATH_PARAM_RE = /\{[^}]+\}|:[a-zA-Z_]\w*/;
+const _PATH_PARAM_CORE = '\\{[^}]+\\}|:[a-zA-Z_]\\w*';
+const PATH_PARAM_RE = new RegExp(_PATH_PARAM_CORE);
 
 /**
  * Full-match variant of PATH_PARAM_RE for segment-level testing.
  * Anchored at both ends so the whole segment must be a parameter.
  */
-const PATH_PARAM_FULL_RE = /^(?:\{[^}]+\}|:[a-zA-Z_]\w*)$/;
+const PATH_PARAM_FULL_RE = new RegExp(`^(?:${_PATH_PARAM_CORE})$`);
 
 /**
  * Check if a URL path contains path parameter placeholders.
@@ -67,7 +68,7 @@ export function resolveHttpVerb(method: string, pathHasParams: boolean): string 
   const methodUpper = method.toUpperCase();
   if (methodUpper === 'GET') {
     const key = pathHasParams ? 'GET_ID' : 'GET';
-    return SCANNER_VERB_MAP[key];
+    return SCANNER_VERB_MAP[key] ?? method.toLowerCase();
   }
   return SCANNER_VERB_MAP[methodUpper] ?? method.toLowerCase();
 }
