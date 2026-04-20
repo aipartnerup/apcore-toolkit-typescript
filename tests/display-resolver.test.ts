@@ -676,4 +676,55 @@ describe('DisplayResolver', () => {
       expect(display.cli.alias).toBe('tasks.user-data.search');
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Malformed binding data (D1-4 regression)
+  // -------------------------------------------------------------------------
+
+  describe('malformed binding data graceful fallback (D1-4 regression)', () => {
+    it('falls back to scanner tags when binding tags is a string, not an array', () => {
+      const m = mod({ moduleId: 'image.resize', tags: ['scan'] });
+      const bindingData = {
+        bindings: [{ module_id: 'image.resize', display: { tags: 'flat-string' } }],
+      };
+      const [resolved] = resolver.resolve([m], { bindingData });
+      const display = resolved.metadata['display'] as { tags: string[] };
+      expect(Array.isArray(display.tags)).toBe(true);
+      expect(display.tags).toEqual(['scan']); // fallback to scanner tags
+    });
+
+    it('falls back to {} when binding display is a string, not an object', () => {
+      const m = mod({ moduleId: 'image.resize' });
+      const bindingData = {
+        bindings: [{ module_id: 'image.resize', display: 'not-an-object' }],
+      };
+      // Should not throw; fallback to scanner-derived display
+      expect(() => resolver.resolve([m], { bindingData })).not.toThrow();
+      const [resolved] = resolver.resolve([m], { bindingData });
+      const display = resolved.metadata['display'] as { alias: string };
+      expect(display.alias).toBe('image.resize'); // falls back to moduleId
+    });
+
+    it('falls back to {} when surface-specific config (cli/mcp/a2a) is an array', () => {
+      const m = mod({ moduleId: 'image.resize' });
+      const bindingData = {
+        bindings: [{ module_id: 'image.resize', display: { cli: ['not', 'an', 'object'] } }],
+      };
+      expect(() => resolver.resolve([m], { bindingData })).not.toThrow();
+      const [resolved] = resolver.resolve([m], { bindingData });
+      const display = resolved.metadata['display'] as { cli: { alias: string } };
+      expect(display.cli.alias).toBe('image.resize'); // falls back to moduleId
+    });
+
+    it('ignores non-string alias values and falls back to moduleId', () => {
+      const m = mod({ moduleId: 'image.resize' });
+      const bindingData = {
+        bindings: [{ module_id: 'image.resize', display: { alias: 42 } }],
+      };
+      expect(() => resolver.resolve([m], { bindingData })).not.toThrow();
+      const [resolved] = resolver.resolve([m], { bindingData });
+      const display = resolved.metadata['display'] as { alias: string };
+      expect(display.alias).toBe('image.resize');
+    });
+  });
 });

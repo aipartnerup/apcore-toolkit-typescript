@@ -180,37 +180,53 @@ export class DisplayResolver {
    *
    * The top-level field takes precedence when set to a truthy value.
    */
+  private static _asStr(val: unknown): string | undefined {
+    return typeof val === 'string' ? val : undefined;
+  }
+
+  private static _asObj(val: unknown): Record<string, unknown> {
+    return val !== null && typeof val === 'object' && !Array.isArray(val)
+      ? (val as Record<string, unknown>)
+      : {};
+  }
+
+  private static _asStrArray(val: unknown, fallback: readonly string[]): string[] {
+    if (Array.isArray(val)) return val.filter((v): v is string => typeof v === 'string');
+    return [...fallback];
+  }
+
   private _resolveOne(mod: ScannedModule, bindingMap: BindingMap): ScannedModule {
     const entry = bindingMap[mod.moduleId] ?? {};
-    const displayCfg = (entry['display'] as Record<string, unknown>) ?? {};
-    const bindingDesc = entry['description'] as string | undefined;
-    const bindingDocs = entry['documentation'] as string | undefined;
+    const displayCfg = DisplayResolver._asObj(entry['display']);
+    const bindingDesc = DisplayResolver._asStr(entry['description']);
+    const bindingDocs = DisplayResolver._asStr(entry['documentation']);
     const fieldAlias = (mod as { suggestedAlias?: string | null }).suggestedAlias ?? null;
     const metaAlias = (mod.metadata?.['suggested_alias'] as string | undefined) ?? null;
     const suggestedAlias: string | null = fieldAlias || metaAlias;
 
     // -- Resolve cross-surface defaults --
     const defaultAlias: string =
-      (displayCfg['alias'] as string) || suggestedAlias || mod.moduleId;
+      DisplayResolver._asStr(displayCfg['alias']) || suggestedAlias || mod.moduleId;
     const defaultDescription: string =
-      (displayCfg['description'] as string) || bindingDesc || mod.description;
+      DisplayResolver._asStr(displayCfg['description']) || bindingDesc || mod.description;
     const defaultDocumentation: string | null =
-      (displayCfg['documentation'] as string) || bindingDocs || mod.documentation || null;
-    const defaultGuidance: string | null = (displayCfg['guidance'] as string) || null;
-    const resolvedTags: string[] =
-      (displayCfg['tags'] as string[]) ?? (entry['tags'] as string[]) ?? [...mod.tags];
+      DisplayResolver._asStr(displayCfg['documentation']) ?? bindingDocs ?? mod.documentation ?? null;
+    const defaultGuidance: string | null = DisplayResolver._asStr(displayCfg['guidance']) ?? null;
+    const resolvedTags: string[] = displayCfg['tags'] !== undefined
+      ? DisplayResolver._asStrArray(displayCfg['tags'], mod.tags)
+      : DisplayResolver._asStrArray(entry['tags'] !== undefined ? entry['tags'] : mod.tags, mod.tags);
 
     // -- Resolve per-surface fields --
     const resolveSurface = (
       key: string,
     ): { surface: SurfaceDisplay; aliasExplicit: boolean } => {
-      const sc = (displayCfg[key] as Record<string, unknown>) ?? {};
-      const aliasExplicit = Boolean(sc['alias']);
+      const sc = DisplayResolver._asObj(displayCfg[key]);
+      const aliasExplicit = Boolean(DisplayResolver._asStr(sc['alias']));
       return {
         surface: {
-          alias: (sc['alias'] as string) || defaultAlias,
-          description: (sc['description'] as string) || defaultDescription,
-          guidance: (sc['guidance'] as string) || defaultGuidance,
+          alias: DisplayResolver._asStr(sc['alias']) || defaultAlias,
+          description: DisplayResolver._asStr(sc['description']) || defaultDescription,
+          guidance: DisplayResolver._asStr(sc['guidance']) ?? defaultGuidance,
         },
         aliasExplicit,
       };
