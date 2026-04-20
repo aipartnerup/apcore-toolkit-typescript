@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import type { ScannedModule } from './types.js';
 import { cloneModule } from './types.js';
+import { PROTO_DENY } from './internal/safe-keys.js';
 
 const MCP_ALIAS_MAX = 64;
 const MCP_ALIAS_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;
@@ -129,7 +130,7 @@ export class DisplayResolver {
       const result: BindingMap = Object.create(null) as BindingMap;
       for (const entry of bindings) {
         const id = entry['module_id'] as string | undefined;
-        if (id != null && id !== '__proto__' && id !== 'constructor' && id !== 'prototype') {
+        if (id != null && !PROTO_DENY.has(id)) {
           result[id] = entry;
         }
       }
@@ -138,7 +139,7 @@ export class DisplayResolver {
     // Already a map
     const result: BindingMap = Object.create(null) as BindingMap;
     for (const [k, v] of Object.entries(data)) {
-      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (PROTO_DENY.has(k)) continue;
       if (v != null && typeof v === 'object' && !Array.isArray(v)) {
         result[k] = v as BindingEntry;
       }
@@ -163,7 +164,7 @@ export class DisplayResolver {
       }
     } catch {
       console.warn(`DisplayResolver: binding path not found: ${bindingPath}`);
-      return {};
+      return Object.create(null) as BindingMap;
     }
 
     for (const f of files) {

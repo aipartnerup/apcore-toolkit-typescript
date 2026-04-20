@@ -65,7 +65,7 @@ export function hasPathParams(path: string): boolean {
  * @param pathHasParams - True if the corresponding route has path parameters.
  * @returns Semantic verb string (e.g., `"create"`, `"list"`, `"get"`).
  */
-const _PROTO_DENY = new Set(['__proto__', 'constructor', 'prototype']);
+import { PROTO_DENY as _PROTO_DENY } from './internal/safe-keys.js';
 
 export function resolveHttpVerb(method: string, pathHasParams: boolean): string {
   if (typeof method !== 'string') return 'unknown';

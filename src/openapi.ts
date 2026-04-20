@@ -1,6 +1,6 @@
 // OpenAPI schema extraction utilities
 
-const PROTO_DENY_LIST = new Set(['__proto__', 'constructor', 'prototype']);
+import { PROTO_DENY as PROTO_DENY_LIST } from './internal/safe-keys.js';
 
 export function resolveRef(
   refString: string,
@@ -28,7 +28,9 @@ export function resolveSchema(
   openapiDoc: Record<string, unknown> | null,
 ): Record<string, unknown> {
   if (openapiDoc && "$ref" in schema) {
-    return resolveRef(schema["$ref"] as string, openapiDoc);
+    const ref = schema["$ref"];
+    if (typeof ref !== 'string') return schema;
+    return resolveRef(ref, openapiDoc);
   }
   return schema;
 }
@@ -50,7 +52,9 @@ export function deepResolveRefs(
   }
 
   if ("$ref" in schema) {
-    const resolved = resolveRef(schema["$ref"] as string, openapiDoc);
+    const ref = schema["$ref"];
+    if (typeof ref !== 'string') return schema;
+    const resolved = resolveRef(ref, openapiDoc);
     return deepResolveRefs(resolved, openapiDoc, depth + 1);
   }
 
@@ -59,9 +63,11 @@ export function deepResolveRefs(
   // Resolve inside allOf/anyOf/oneOf
   for (const key of ["allOf", "anyOf", "oneOf"] as const) {
     if (key in result && Array.isArray(result[key])) {
-      result[key] = (result[key] as Record<string, unknown>[]).map((item) =>
-        deepResolveRefs(item, openapiDoc, depth + 1),
-      );
+      result[key] = (result[key] as unknown[])
+        .filter((item): item is Record<string, unknown> =>
+          item !== null && typeof item === 'object' && !Array.isArray(item),
+        )
+        .map((item) => deepResolveRefs(item, openapiDoc, depth + 1));
     }
   }
 
@@ -118,8 +124,8 @@ export function extractInputSchema(
     : [];
   for (const param of parameters) {
     if (param["in"] === "query" || param["in"] === "path") {
-      const name = param["name"] as string;
-      if (PROTO_DENY_LIST.has(name)) continue;
+      const name = param["name"];
+      if (typeof name !== 'string' || PROTO_DENY_LIST.has(name)) continue;
       let paramSchema = (param["schema"] ?? { type: "string" }) as Record<string, unknown>;
       paramSchema = resolveSchema(paramSchema, openapiDoc);
       schema.properties[name] = paramSchema;

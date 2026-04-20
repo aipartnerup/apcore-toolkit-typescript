@@ -14,6 +14,7 @@ import type { ModuleAnnotations, ModuleExample } from 'apcore-js';
 import { annotationsFromJSON } from 'apcore-js';
 import type { ScannedModule } from './types.js';
 import { createScannedModule } from './types.js';
+import { PROTO_DENY } from './internal/safe-keys.js';
 
 const SUPPORTED_SPEC_VERSIONS = new Set(['1.0']);
 const LOOSE_REQUIRED = ['module_id', 'target'] as const;
@@ -306,7 +307,7 @@ export class BindingLoader {
    * warning and fall back to an empty record so the malformed data does not
    * silently persist through round-trip.
    */
-  private static readonly _PROTO_DENY = new Set(['__proto__', 'constructor', 'prototype']);
+  private static readonly _PROTO_DENY = PROTO_DENY;
 
   private _asRecord(value: unknown, fieldName: string, moduleId: string): Record<string, unknown> {
     if (value == null) return {};
@@ -334,7 +335,12 @@ export class BindingLoader {
   ): Record<string, unknown> | null {
     if (value == null) return null;
     if (typeof value === 'object' && !Array.isArray(value)) {
-      return structuredClone(value) as Record<string, unknown>;
+      const src = value as Record<string, unknown>;
+      const filtered: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(src)) {
+        if (!BindingLoader._PROTO_DENY.has(k)) filtered[k] = v;
+      }
+      return structuredClone(filtered);
     }
     console.warn(
       `BindingLoader: ${fieldName} for module ${moduleId} is not a dict (${typeof value}); treating as null`,

@@ -1,3 +1,5 @@
+import { PROTO_DENY } from './internal/safe-keys.js';
+
 /**
  * Enrich a JSON Schema's property descriptions from an external map.
  *
@@ -33,9 +35,10 @@ export function enrichSchemaDescriptions(
   const resultProps = result.properties as Record<string, Record<string, unknown>>;
 
   for (const [name, desc] of Object.entries(paramDescriptions)) {
-    if (name === '__proto__' || name === 'constructor' || name === 'prototype') continue;
+    if (PROTO_DENY.has(name)) continue;
     if (Object.prototype.hasOwnProperty.call(resultProps, name)) {
       const prop = resultProps[name];
+      if (prop === null || typeof prop !== 'object' || Array.isArray(prop)) continue;
       if (overwrite || !("description" in prop)) {
         prop.description = desc;
       }
