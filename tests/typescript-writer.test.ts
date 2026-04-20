@@ -11,8 +11,16 @@ vi.mock('node:fs', async () => {
     ...actual,
     writeFileSync: vi.fn(),
     mkdirSync: vi.fn(),
-    existsSync: vi.fn().mockReturnValue(true),
     readFileSync: vi.fn().mockReturnValue(''),
+    // realpathSync: identity so /tmp/out resolves to itself (no real dir needed)
+    realpathSync: vi.fn((p: string) => p),
+    // lstatSync: ENOENT so target file is treated as non-existent (not a symlink)
+    lstatSync: vi.fn().mockImplementation(() => {
+      const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      throw err;
+    }),
+    renameSync: vi.fn(),
+    unlinkSync: vi.fn(),
   };
 });
 
@@ -117,8 +125,9 @@ describe('TypeScriptWriter', () => {
     const mod = makeModule({ moduleId: 'weird.id-test', target: 'myapp/views:createUser' });
     writer.write([mod], '/tmp/out');
 
-    const writtenPath = (fs.writeFileSync as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(path.basename(writtenPath)).toBe('weird_id_test.ts');
+    // Atomic write: final destination is the renameSync target (second arg)
+    const finalPath = (fs.renameSync as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(path.basename(finalPath)).toBe('weird_id_test.ts');
   });
 
   it('throws for invalid target without ":"', () => {
@@ -157,23 +166,46 @@ describe('TypeScriptWriter', () => {
     expect(writtenContent).toContain(JSON.stringify({ readOnly: true }));
   });
 
-  it('writes files to outputDir with correct structure', () => {
+  it('writes files to outputDir with atomic write (writeFileSync to tmp, renameSync to final)', () => {
     const mod = makeModule();
     writer.write([mod], '/tmp/out');
 
     expect(fs.mkdirSync).toHaveBeenCalledWith('/tmp/out', { recursive: true });
     expect(fs.writeFileSync).toHaveBeenCalledOnce();
+    expect(fs.renameSync).toHaveBeenCalledOnce();
 
-    const writtenPath = (fs.writeFileSync as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(writtenPath).toBe(path.join('/tmp/out', 'users_get_user.ts'));
+    // renameSync(tmpPath, finalPath) — check final destination
+    const finalPath = (fs.renameSync as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(finalPath).toBe(path.join('/tmp/out', 'users_get_user.ts'));
+
+    // writeFileSync writes to a .tmp path
+    const tmpPath = (fs.writeFileSync as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(tmpPath).toContain('users_get_user.ts');
+    expect(tmpPath).toContain('.tmp');
   });
 
-  it('prevents path traversal in module id', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  // C7 regression: raw moduleId path traversal was blocked by a logically-mismatched
+  // raw-path check; after removal the sanitizer neutralizes traversal chars instead.
+  it('sanitizes path-traversal chars in module_id and writes to safe path', () => {
     const mod = makeModule({ moduleId: '../../../etc/passwd' });
     writer.write([mod], '/tmp/out');
-    // File should not be written — path traversal detected and skipped
-    expect(fs.writeFileSync).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
+
+    // Traversal chars are replaced; the file IS written to the sanitized path
+    expect(fs.renameSync).toHaveBeenCalledOnce();
+    const finalPath = (fs.renameSync as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(finalPath).toMatch(/___+etc_passwd\.ts$/);
+    expect(finalPath).toContain('/tmp/out/');
+  });
+
+  // W18 regression: symlink-escape skips should return a WriteResult, not just warn
+  it('returns failed WriteResult when target file is a pre-existing symlink', () => {
+    (fs.lstatSync as ReturnType<typeof vi.fn>).mockReturnValueOnce({ isSymbolicLink: () => true });
+    const mod = makeModule();
+    const results = writer.write([mod], '/tmp/out');
+
+    expect(fs.renameSync).not.toHaveBeenCalled();
+    expect(results).toHaveLength(1);
+    expect(results[0].verified).toBe(false);
+    expect(results[0].verificationError).toContain('symlink');
   });
 });

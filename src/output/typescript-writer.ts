@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, existsSync, realpathSync } from 'node:fs';
+import { writeFileSync, mkdirSync, realpathSync, lstatSync, renameSync, unlinkSync } from 'node:fs';
 import { resolve, join, sep } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import type { WriteResult } from './types.js';
@@ -35,27 +35,36 @@ export class TypeScriptWriter {
     const resolvedOut = dryRun ? '' : resolve(outputDir);
 
     if (!dryRun) {
-      mkdirSync(resolvedOut, { recursive: true });
+      try {
+        mkdirSync(resolvedOut, { recursive: true });
+      } catch (err) {
+        throw new WriteError(resolvedOut, err);
+      }
     }
 
-    // Dereference symlinks on the output directory itself.
     let realResolvedOut = resolvedOut;
     if (!dryRun) {
-      try { realResolvedOut = realpathSync(resolvedOut); } catch { /* keep logical path */ }
+      try {
+        realResolvedOut = realpathSync(resolvedOut);
+      } catch (err) {
+        throw new WriteError(resolvedOut, err);
+      }
     }
 
     for (const mod of modules) {
-      const code = this._generateCode(mod, timestamp);
+      let code: string;
+      try {
+        code = this._generateCode(mod, timestamp);
+      } catch (err) {
+        if (errorMode === 'collect') {
+          results.push(createWriteResult(mod.moduleId, null, false, err instanceof Error ? err.message : String(err)));
+          continue;
+        }
+        throw new WriteError(mod.moduleId, err);
+      }
 
       if (dryRun) {
         results.push(createWriteResult(mod.moduleId, null));
-        continue;
-      }
-
-      // Path traversal protection: check raw moduleId before sanitization
-      const rawResolved = resolve(join(realResolvedOut, mod.moduleId));
-      if (!rawResolved.startsWith(realResolvedOut + sep) && rawResolved !== realResolvedOut) {
-        console.warn('Skipping module with path traversal in id: %s', mod.moduleId);
         continue;
       }
 
@@ -63,24 +72,29 @@ export class TypeScriptWriter {
       const filename = `${sanitized}.ts`;
       const filePath = resolve(join(realResolvedOut, filename));
 
-      // Also block writes when the target file is a symlink escaping the output dir.
-      let realFilePath = filePath;
-      if (existsSync(filePath)) {
-        try { realFilePath = realpathSync(filePath); } catch { /* keep logical path */ }
-      }
-      if (!realFilePath.startsWith(realResolvedOut + sep) && realFilePath !== realResolvedOut) {
-        console.warn('Skipping file outside output directory (symlink escape): %s', filePath);
-        continue;
-      }
-
+      // Block symlinks pre-created at the target path (TOCTOU mitigation).
+      // lstatSync does not follow symlinks, so it detects symlinks directly.
       try {
-        writeFileSync(filePath, code, 'utf-8');
-      } catch (err) {
-        if (errorMode === 'collect') {
-          results.push(createWriteResult(mod.moduleId, filePath, false, (err as Error).message));
+        if (lstatSync(filePath).isSymbolicLink()) {
+          console.warn('Skipping symlink escape at: %s', filePath);
+          results.push(createWriteResult(mod.moduleId, filePath, false, 'Security skip: symlink at target path'));
           continue;
         }
-        throw new WriteError(filePath, err as Error);
+      } catch { /* file does not exist — safe to write */ }
+
+      // Atomic write: write to a tmp file then rename so readers never see a
+      // partially-written file and so the final rename is atomic on POSIX.
+      const tmpPath = `${filePath}.${process.pid}.tmp`;
+      try {
+        writeFileSync(tmpPath, code, 'utf-8');
+        renameSync(tmpPath, filePath);
+      } catch (err) {
+        try { unlinkSync(tmpPath); } catch { /* best-effort cleanup */ }
+        if (errorMode === 'collect') {
+          results.push(createWriteResult(mod.moduleId, filePath, false, err instanceof Error ? err.message : String(err)));
+          continue;
+        }
+        throw new WriteError(filePath, err);
       }
 
       const result = applyVerification(

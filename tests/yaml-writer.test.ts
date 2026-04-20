@@ -300,9 +300,34 @@ describe('YAMLWriter', () => {
       // Target outside outputDir must NOT be overwritten
       expect(readFileSync(escapedFile, 'utf-8')).toBe('original content');
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Skipping file outside output directory'),
+        expect.stringContaining('Skipping symlink escape at'),
         expect.any(String),
       );
+
+      warnSpy.mockRestore();
+      rmSync(outputDir, { recursive: true, force: true });
+      rmSync(escapeDir, { recursive: true, force: true });
+    });
+
+    // W18 regression: symlink-escape skip should return a failed WriteResult
+    it('returns failed WriteResult when output file is a symlink (W18)', () => {
+      const outputDir = mkdtempSync(join(tmpdir(), 'yaml-writer-w18-'));
+      const escapeDir = mkdtempSync(join(tmpdir(), 'yaml-writer-w18-esc-'));
+      const escapedFile = join(escapeDir, 'escape.binding.yaml');
+      const symlinkPath = join(outputDir, 'escape.binding.yaml');
+
+      writeFileSync(escapedFile, 'original');
+      symlinkSync(escapedFile, symlinkPath);
+
+      const mod = makeModule({ moduleId: 'escape' });
+      const writer = new YAMLWriter();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const results = writer.write([mod], outputDir);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].verified).toBe(false);
+      expect(results[0].verificationError).toContain('symlink');
 
       warnSpy.mockRestore();
       rmSync(outputDir, { recursive: true, force: true });
