@@ -20,14 +20,19 @@ function _escapePipe(text: string): string {
   return text.replace(/\|/g, '\\|');
 }
 
-function _compactRepr(value: unknown, maxLen = 80): string {
+function _compactRepr(value: unknown, maxLen = 80, _visited?: WeakSet<object>): string {
+  const visited = _visited ?? new WeakSet<object>();
   let text: string;
   if (Array.isArray(value)) {
-    const parts = value.map(v => _compactRepr(v, 30));
+    if (visited.has(value)) return '[Circular]';
+    visited.add(value);
+    const parts = value.map(v => _compactRepr(v, 30, visited));
     text = `[${parts.join(', ')}]`;
   } else if (value !== null && typeof value === 'object') {
+    if (visited.has(value as object)) return '[Circular]';
+    visited.add(value as object);
     const parts = Object.entries(value as Record<string, unknown>).map(
-      ([k, v]) => `${k}: ${_compactRepr(v, 30)}`,
+      ([k, v]) => `${k}: ${_compactRepr(v, 30, visited)}`,
     );
     text = `{${parts.join(', ')}}`;
   } else if (_isScalar(value)) {

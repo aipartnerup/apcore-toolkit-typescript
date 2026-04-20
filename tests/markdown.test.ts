@@ -294,4 +294,32 @@ describe('toMarkdown', () => {
     expect(result).toContain('  - [1, 2]');
     expect(result).toContain('  - [3, 4]');
   });
+
+  // Circular-ref DoS regression (D2-circular)
+  it('handles circular object without stack overflow', () => {
+    const obj: Record<string, unknown> = { a: 1 };
+    obj.self = obj;
+    expect(() => toMarkdown(obj)).not.toThrow();
+    const result = toMarkdown(obj);
+    expect(result).toContain('[Circular]');
+  });
+
+  it('handles circular array without stack overflow', () => {
+    const arr: unknown[] = [1, 2];
+    arr.push(arr);
+    const data: Record<string, unknown> = { items: arr };
+    expect(() => toMarkdown(data)).not.toThrow();
+    const result = toMarkdown(data);
+    expect(result).toContain('[Circular]');
+  });
+
+  it('handles mutual circular references without stack overflow', () => {
+    const a: Record<string, unknown> = { name: 'a' };
+    const b: Record<string, unknown> = { name: 'b' };
+    a.other = b;
+    b.other = a;
+    expect(() => toMarkdown(a)).not.toThrow();
+    const result = toMarkdown(a);
+    expect(result).toContain('[Circular]');
+  });
 });
