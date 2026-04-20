@@ -108,6 +108,23 @@ describe("enrichSchemaDescriptions", () => {
     expect(Object.prototype.hasOwnProperty.call(Object.prototype, "name")).toBe(false);
   });
 
+  // B1 regression: prototype-chain walk via inherited keys like 'toString'
+  it("does not mutate built-in prototype properties when paramDescription key is inherited (e.g. 'toString')", () => {
+    const schema = { properties: { name: { type: "string" } } };
+    const originalToString = Function.prototype.toString;
+    enrichSchemaDescriptions(schema, { toString: "evil" });
+    // The built-in must not have been mutated
+    expect(Function.prototype.toString).toBe(originalToString);
+    expect((Function.prototype.toString as unknown as Record<string, unknown>).description).toBeUndefined();
+  });
+
+  it("does not mutate built-in prototype properties when paramDescription key is 'hasOwnProperty'", () => {
+    const schema = { properties: { name: { type: "string" } } };
+    const orig = Object.prototype.hasOwnProperty;
+    enrichSchemaDescriptions(schema, { hasOwnProperty: "evil" });
+    expect(Object.prototype.hasOwnProperty).toBe(orig);
+  });
+
   it("does not throw when schema contains non-cloneable values (DataCloneError)", () => {
     const schema = {
       type: "object",
