@@ -210,6 +210,19 @@ describe('BaseScanner', () => {
       );
     });
 
+    it('does not collide with pre-existing suffixed ID (W14-parity regression)', () => {
+      const modules = [
+        makeModule('mod-a'),
+        makeModule('mod-a_2'), // pre-existing — must not be overwritten by rename
+        makeModule('mod-a'),   // duplicate that would naively become mod-a_2
+      ];
+      const result = scanner.deduplicateIds(modules);
+      expect(result).toHaveLength(3);
+      expect(result[0].moduleId).toBe('mod-a');
+      expect(result[1].moduleId).toBe('mod-a_2');
+      expect(result[2].moduleId).toBe('mod-a_3'); // skip taken _2, use _3
+    });
+
     it('preserves original modules (returns new instances for renamed)', () => {
       const original = makeModule('mod-a');
       const duplicate = makeModule('mod-a');

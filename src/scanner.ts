@@ -111,16 +111,25 @@ export abstract class BaseScanner {
   }
 
   deduplicateIds(modules: ScannedModule[]): ScannedModule[] {
-    const seen = new Map<string, number>();
+    const seenCount = new Map<string, number>();
+    // Pre-populate with all original IDs so generated suffixes never collide
+    // with an ID that already exists in the input list.
+    const usedIds = new Set<string>(modules.map((m) => m.moduleId));
     const result: ScannedModule[] = [];
 
     for (const module of modules) {
       const mid = module.moduleId;
-      const count = seen.get(mid) ?? 0;
-      seen.set(mid, count + 1);
+      const count = seenCount.get(mid) ?? 0;
+      seenCount.set(mid, count + 1);
 
       if (count > 0) {
-        const newId = `${mid}_${count + 1}`;
+        let counter = count + 1;
+        let newId = `${mid}_${counter}`;
+        while (usedIds.has(newId)) {
+          counter++;
+          newId = `${mid}_${counter}`;
+        }
+        usedIds.add(newId);
         result.push(
           cloneModule(module, {
             moduleId: newId,
