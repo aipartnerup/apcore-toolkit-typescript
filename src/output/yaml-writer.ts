@@ -62,6 +62,7 @@ export class YAMLWriter {
 
     const results: WriteResult[] = [];
     const timestamp = new Date().toISOString();
+    const writtenIds = new Map<string, string>(); // filename → moduleId that claimed it
 
     for (const module of modules) {
       const bindingData = this._buildBinding(module);
@@ -77,6 +78,17 @@ export class YAMLWriter {
       // Build filePath from the real (symlink-resolved) output dir so the
       // prefix check below compares canonical paths on both sides.
       const filePath = resolve(join(realOutputPath, filename));
+
+      // Warn if this filename was already claimed by another module in this batch.
+      if (writtenIds.has(filename)) {
+        console.warn(
+          'YAMLWriter: safeId collision — "%s" and "%s" both map to %s; overwriting',
+          writtenIds.get(filename),
+          module.moduleId,
+          filename,
+        );
+      }
+      writtenIds.set(filename, module.moduleId);
 
       // Block pre-existing symlinks at the target path (TOCTOU mitigation).
       try {
