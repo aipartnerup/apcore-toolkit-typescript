@@ -53,9 +53,18 @@ export class SyntaxVerifier implements Verifier {
       if (ts === null) {
         return { ok: false, error: 'typescript package required for syntax verification' };
       }
-      const sourceFile = ts.createSourceFile('temp.ts', content, ts.ScriptTarget.Latest, true);
-      const diagnostics = (sourceFile as any).parseDiagnostics as Array<{ messageText: string | { messageText: string } }> | undefined;
-      if (diagnostics && diagnostics.length > 0) {
+      const program = ts.createProgram([path], {
+        noLib: true,
+        noResolve: true,
+        skipLibCheck: true,
+        strict: false,
+      });
+      const sourceFile = program.getSourceFile(path);
+      if (!sourceFile) {
+        return { ok: false, error: 'TypeScript compiler could not load file' };
+      }
+      const diagnostics = program.getSyntacticDiagnostics(sourceFile);
+      if (diagnostics.length > 0) {
         const msg = diagnostics[0].messageText;
         const text = typeof msg === 'string' ? msg : msg.messageText;
         return { ok: false, error: `Syntax error: ${text}` };

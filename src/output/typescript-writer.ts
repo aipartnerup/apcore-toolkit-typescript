@@ -21,11 +21,12 @@ export class TypeScriptWriter {
   write(
     modules: ScannedModule[],
     outputDir: string,
-    options?: { dryRun?: boolean; verify?: boolean; verifiers?: Verifier[] },
+    options?: { dryRun?: boolean; verify?: boolean; verifiers?: Verifier[]; errorMode?: 'throw' | 'collect' },
   ): WriteResult[] {
     const dryRun = options?.dryRun ?? false;
     const shouldVerify = options?.verify ?? false;
     const verifiers = options?.verifiers ?? [];
+    const errorMode = options?.errorMode ?? 'throw';
     const results: WriteResult[] = [];
     const timestamp = new Date().toISOString();
 
@@ -57,6 +58,10 @@ export class TypeScriptWriter {
       try {
         writeFileSync(filePath, code, 'utf-8');
       } catch (err) {
+        if (errorMode === 'collect') {
+          results.push(createWriteResult(mod.moduleId, filePath, false, (err as Error).message));
+          continue;
+        }
         throw new WriteError(filePath, err as Error);
       }
 
