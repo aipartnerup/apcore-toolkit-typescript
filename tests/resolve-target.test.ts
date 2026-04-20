@@ -58,6 +58,23 @@ describe("resolveTarget", () => {
     ).rejects.toThrow("not under any allowed prefix");
   });
 
+  it("rejects import when realpathSync fails with non-ENOENT error (e.g. symlink loop)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "resolve-loop-"));
+    const a = join(dir, "a.mjs");
+    const b = join(dir, "b.mjs");
+    symlinkSync(b, a);
+    symlinkSync(a, b); // ELOOP cycle
+
+    try {
+      // Should throw — not silently fall back to lexical resolve
+      await expect(
+        resolveTarget(`${a}:default`, [dir]),
+      ).rejects.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a symlink inside an allowed prefix that points outside (D2-4 regression)", async () => {
     const safeDir = mkdtempSync(join(tmpdir(), "resolve-safe-"));
     const dangerDir = mkdtempSync(join(tmpdir(), "resolve-danger-"));

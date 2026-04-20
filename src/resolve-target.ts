@@ -44,7 +44,20 @@ export async function resolveTarget(
   }
   if (isFilePath && allowedPrefixes != null && allowedPrefixes.length > 0) {
     let resolved = resolve(modulePath);
-    try { resolved = realpathSync(resolved); } catch { /* path may not exist yet; keep logical resolve */ }
+    try {
+      resolved = realpathSync(resolved);
+    } catch (resolveErr) {
+      const code = (resolveErr as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') {
+        // Non-ENOENT errors (ELOOP, EACCES, etc.) indicate a path that cannot
+        // be safely canonicalized — reject rather than fall back to lexical resolve.
+        throw new Error(
+          `Import path "${modulePath}" could not be canonicalized: ${(resolveErr as Error).message}`,
+          { cause: resolveErr },
+        );
+      }
+      // ENOENT: file will be created; use lexical resolved path for prefix check.
+    }
     const allowed = allowedPrefixes.some((prefix) => {
       let resolvedPrefix = resolve(prefix);
       try { resolvedPrefix = realpathSync(resolvedPrefix); } catch { /* keep logical resolve */ }
