@@ -23,7 +23,6 @@ export {
 } from './serializers.js';
 export { resolveTarget } from './resolve-target.js';
 export { toMarkdown } from './formatting/index.js';
-export { flattenParams } from './flatten-params.js';
 export { AIEnhancer } from './ai-enhancer.js';
 export type { AIEnhancerOptions, Enhancer } from './ai-enhancer.js';
 export { DisplayResolver } from './display-resolver.js';
