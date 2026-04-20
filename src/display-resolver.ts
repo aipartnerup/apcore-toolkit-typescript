@@ -116,21 +116,24 @@ export class DisplayResolver {
   }
 
   private _parseBindingData(data: Record<string, unknown>): BindingMap {
-    // Accept either { bindings: [...] } or a direct moduleId → entry map
+    // Accept either { bindings: [...] } or a direct moduleId → entry map.
+    // Use Object.create(null) so that user-controlled keys like '__proto__'
+    // cannot pollute Object.prototype.
     if ('bindings' in data) {
       const bindings = (data['bindings'] as Array<Record<string, unknown>>) ?? [];
-      const result: BindingMap = {};
+      const result: BindingMap = Object.create(null) as BindingMap;
       for (const entry of bindings) {
         const id = entry['module_id'] as string | undefined;
-        if (id != null) {
+        if (id != null && id !== '__proto__' && id !== 'constructor' && id !== 'prototype') {
           result[id] = entry;
         }
       }
       return result;
     }
     // Already a map
-    const result: BindingMap = {};
+    const result: BindingMap = Object.create(null) as BindingMap;
     for (const [k, v] of Object.entries(data)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
       if (v != null && typeof v === 'object' && !Array.isArray(v)) {
         result[k] = v as BindingEntry;
       }
@@ -159,12 +162,18 @@ export class DisplayResolver {
     }
 
     for (const f of files) {
+      let content: string;
       try {
-        const content = fs.readFileSync(f, 'utf-8');
+        content = fs.readFileSync(f, 'utf-8');
+      } catch (exc) {
+        console.warn(`DisplayResolver: failed to read ${f}: ${exc}`);
+        continue;
+      }
+      try {
         const data = (yaml.load(content) as Record<string, unknown>) ?? {};
         Object.assign(result, this._parseBindingData(data));
       } catch (exc) {
-        console.warn(`DisplayResolver: failed to load ${f}: ${exc}`);
+        console.warn(`DisplayResolver: failed to parse ${f}: ${exc}`);
       }
     }
 

@@ -727,4 +727,45 @@ describe('DisplayResolver', () => {
       expect(display.alias).toBe('image.resize');
     });
   });
+
+  // Prototype pollution regression (D2-proto)
+  describe('_parseBindingData — prototype pollution guard', () => {
+    it('does not pollute Object.prototype via __proto__ module_id in bindings list', () => {
+      const resolver = new DisplayResolver();
+      const m = mod({ moduleId: 'safe.module' });
+      const bindingData = {
+        bindings: [{ module_id: '__proto__', isAdmin: true }],
+      };
+      resolver.resolve([m], { bindingData });
+      expect(({} as Record<string, unknown>).isAdmin).toBeUndefined();
+    });
+
+    it('does not pollute Object.prototype via __proto__ key in direct map', () => {
+      const resolver = new DisplayResolver();
+      const m = mod({ moduleId: 'safe.module' });
+      const bindingData = { __proto__: { isAdmin: true } } as Record<string, unknown>;
+      resolver.resolve([m], { bindingData });
+      expect(({} as Record<string, unknown>).isAdmin).toBeUndefined();
+    });
+  });
+
+  // Split IO/parse error regression (D8-display)
+  describe('_loadBindingFiles — separate IO vs parse error messages', () => {
+    it('warns with "failed to read" for missing file in directory', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const resolver = new DisplayResolver();
+      const m = mod({ moduleId: 'test.mod' });
+
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'display-resolver-io-'));
+      const fakeDir = path.join(tmpDir, 'nonexistent-subdir');
+
+      resolver.resolve([m], { bindingPath: fakeDir });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('binding path not found'),
+      );
+
+      warnSpy.mockRestore();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+  });
 });
