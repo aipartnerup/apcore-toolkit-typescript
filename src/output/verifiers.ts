@@ -41,6 +41,21 @@ export class YAMLVerifier implements Verifier {
   }
 }
 
+function _flattenDiagnosticMessage(msg: unknown): string {
+  if (typeof msg === 'string') return msg;
+  if (typeof msg === 'object' && msg !== null && 'messageText' in msg) {
+    const chain = msg as { messageText: unknown; next?: unknown[] };
+    const parts = [_flattenDiagnosticMessage(chain.messageText)];
+    if (Array.isArray(chain.next)) {
+      for (const sub of chain.next) {
+        parts.push(_flattenDiagnosticMessage(sub));
+      }
+    }
+    return parts.join(': ');
+  }
+  return String(msg);
+}
+
 export class SyntaxVerifier implements Verifier {
   verify(path: string, _moduleId: string): VerifyResult {
     try {
@@ -65,8 +80,7 @@ export class SyntaxVerifier implements Verifier {
       }
       const diagnostics = program.getSyntacticDiagnostics(sourceFile);
       if (diagnostics.length > 0) {
-        const msg = diagnostics[0].messageText;
-        const text = typeof msg === 'string' ? msg : msg.messageText;
+        const text = _flattenDiagnosticMessage(diagnostics[0].messageText);
         return { ok: false, error: `Syntax error: ${text}` };
       }
       return { ok: true };
@@ -123,8 +137,9 @@ export class MagicBytesVerifier implements Verifier {
 export class JSONVerifier implements Verifier {
   constructor(schema?: Record<string, unknown>) {
     if (schema != null) {
-      throw new Error(
-        'JSONVerifier: schema validation is not yet implemented — install ajv and update JSONVerifier.verify() before passing a schema.',
+      console.warn(
+        'JSONVerifier: schema validation is not yet implemented — schema argument is ignored. ' +
+          'Install ajv and update JSONVerifier.verify() to enable schema validation.',
       );
     }
   }

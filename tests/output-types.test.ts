@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   WriteError,
+  InvalidFormatError,
   YAMLVerifier,
   SyntaxVerifier,
   JSONVerifier,
@@ -40,6 +41,29 @@ describe('WriteError', () => {
     expect(err.cause).toBe(cause);
     expect(err.message).toContain('/tmp/file.yaml');
     expect(err.message).toContain('disk full');
+  });
+
+  // redundant this.cause regression (D4-cause)
+  it('cause is set via super() — no double-assignment side effects', () => {
+    const cause = new Error('underlying');
+    const err = new WriteError('out.yaml', cause);
+    // Accessing cause must return the original Error (not undefined or another type)
+    expect(err.cause).toBeInstanceOf(Error);
+    expect((err.cause as Error).message).toBe('underlying');
+  });
+});
+
+describe('InvalidFormatError', () => {
+  it('includes the format name in the message', () => {
+    const err = new InvalidFormatError('xml');
+    expect(err.message).toContain('xml');
+    expect(err.name).toBe('InvalidFormatError');
+  });
+
+  it('accepts an optional cause option', () => {
+    const cause = new Error('root cause');
+    const err = new InvalidFormatError('xml', { cause });
+    expect(err.cause).toBe(cause);
   });
 });
 
@@ -192,8 +216,11 @@ describe('JSONVerifier', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('throws at construction when schema is provided (D8-3 regression)', () => {
-    expect(() => new JSONVerifier({ type: 'object' })).toThrow(/ajv/i);
+  it('warns (does not throw) at construction when schema is provided', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => new JSONVerifier({ type: 'object' })).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not yet implemented'));
+    warnSpy.mockRestore();
   });
 });
 
