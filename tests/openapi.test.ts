@@ -77,6 +77,21 @@ describe("resolveRef", () => {
     const doc = { components: {} };
     expect(resolveRef("#/components/schemas/Foo", doc)).toEqual({});
   });
+
+  it("decodes JSON Pointer ~1 (slash) and ~0 (tilde) escape sequences (D1-5 regression)", () => {
+    const doc = {
+      components: {
+        schemas: {
+          "a/b": { type: "string" },
+          "a~b": { type: "integer" },
+        },
+      },
+    };
+    // ~1 encodes '/' in a JSON Pointer path segment
+    expect(resolveRef("#/components/schemas/a~1b", doc)).toEqual({ type: "string" });
+    // ~0 encodes '~'
+    expect(resolveRef("#/components/schemas/a~0b", doc)).toEqual({ type: "integer" });
+  });
 });
 
 describe("resolveSchema", () => {

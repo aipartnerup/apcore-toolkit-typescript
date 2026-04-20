@@ -7,7 +7,7 @@ export function resolveRef(
   if (!refString.startsWith("#/")) {
     return {};
   }
-  const parts = refString.slice(2).split("/");
+  const parts = refString.slice(2).split("/").map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
   let current: unknown = openapiDoc;
   for (const part of parts) {
     if (typeof current !== "object" || current === null || Array.isArray(current)) {
