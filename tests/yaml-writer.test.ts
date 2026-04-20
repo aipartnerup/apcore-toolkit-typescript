@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createAnnotations } from 'apcore-js';
-import { mkdtempSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, readdirSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { YAMLWriter } from '../src/output/yaml-writer.js';
@@ -277,5 +277,36 @@ describe('YAMLWriter', () => {
       rmSync(tmpDir, { recursive: true, force: true });
     });
 
+  });
+
+  // Symlink escape regression (D2-symlink)
+  describe('symlink escape protection', () => {
+    it('blocks write when output file is a symlink pointing outside outputDir', () => {
+      const outputDir = mkdtempSync(join(tmpdir(), 'yaml-writer-symlink-'));
+      const escapeDir = mkdtempSync(join(tmpdir(), 'yaml-writer-escape-'));
+      const escapedFile = join(escapeDir, 'escape.binding.yaml');
+      const symlinkPath = join(outputDir, 'escape.binding.yaml');
+
+      // Pre-create the symlink target so realpathSync resolves correctly
+      writeFileSync(escapedFile, 'original content');
+      symlinkSync(escapedFile, symlinkPath);
+
+      const mod = makeModule({ moduleId: 'escape' });
+      const writer = new YAMLWriter();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      writer.write([mod], outputDir);
+
+      // Target outside outputDir must NOT be overwritten
+      expect(readFileSync(escapedFile, 'utf-8')).toBe('original content');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping file outside output directory'),
+        expect.any(String),
+      );
+
+      warnSpy.mockRestore();
+      rmSync(outputDir, { recursive: true, force: true });
+      rmSync(escapeDir, { recursive: true, force: true });
+    });
   });
 });

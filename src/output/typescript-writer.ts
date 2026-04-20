@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, realpathSync } from 'node:fs';
 import { resolve, join, sep } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import type { WriteResult } from './types.js';
@@ -38,6 +38,12 @@ export class TypeScriptWriter {
       mkdirSync(resolvedOut, { recursive: true });
     }
 
+    // Dereference symlinks on the output directory itself.
+    let realResolvedOut = resolvedOut;
+    if (!dryRun) {
+      try { realResolvedOut = realpathSync(resolvedOut); } catch { /* keep logical path */ }
+    }
+
     for (const mod of modules) {
       const code = this._generateCode(mod, timestamp);
 
@@ -47,15 +53,25 @@ export class TypeScriptWriter {
       }
 
       // Path traversal protection: check raw moduleId before sanitization
-      const rawResolved = resolve(join(resolvedOut, mod.moduleId));
-      if (!rawResolved.startsWith(resolvedOut + sep) && rawResolved !== resolvedOut) {
+      const rawResolved = resolve(join(realResolvedOut, mod.moduleId));
+      if (!rawResolved.startsWith(realResolvedOut + sep) && rawResolved !== realResolvedOut) {
         console.warn('Skipping module with path traversal in id: %s', mod.moduleId);
         continue;
       }
 
       const sanitized = this._sanitizeIdentifier(mod.moduleId);
       const filename = `${sanitized}.ts`;
-      const filePath = resolve(join(resolvedOut, filename));
+      const filePath = resolve(join(realResolvedOut, filename));
+
+      // Also block writes when the target file is a symlink escaping the output dir.
+      let realFilePath = filePath;
+      if (existsSync(filePath)) {
+        try { realFilePath = realpathSync(filePath); } catch { /* keep logical path */ }
+      }
+      if (!realFilePath.startsWith(realResolvedOut + sep) && realFilePath !== realResolvedOut) {
+        console.warn('Skipping file outside output directory (symlink escape): %s', filePath);
+        continue;
+      }
 
       try {
         writeFileSync(filePath, code, 'utf-8');

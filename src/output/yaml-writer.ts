@@ -1,5 +1,5 @@
 import yaml from 'js-yaml';
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, realpathSync } from 'node:fs';
 import { resolve, join, sep } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import { annotationsToDict } from '../serializers.js';
@@ -46,6 +46,14 @@ export class YAMLWriter {
       mkdirSync(outputPath, { recursive: true });
     }
 
+    // Dereference symlinks on the output directory itself so that a symlinked
+    // outputDir pointing outside the intended tree is caught by the prefix check.
+    let realOutputPath = outputPath;
+    if (!dryRun) {
+      try { realOutputPath = realpathSync(outputPath); } catch { /* keep logical path */ }
+    }
+    const normalizedOutput = realOutputPath.endsWith(sep) ? realOutputPath : realOutputPath + sep;
+
     const results: WriteResult[] = [];
     const timestamp = new Date().toISOString();
 
@@ -60,14 +68,19 @@ export class YAMLWriter {
       let safeId = module.moduleId.replace(/[^a-zA-Z0-9._-]/g, '_');
       safeId = safeId.replace(/\.{2,}/g, '_');
       const filename = `${safeId}.binding.yaml`;
-      const filePath = resolve(join(outputPath, filename));
+      // Build filePath from the real (symlink-resolved) output dir so the
+      // prefix check below compares canonical paths on both sides.
+      const filePath = resolve(join(realOutputPath, filename));
 
-      // Path traversal protection: both outputPath and filePath are resolve()d
-      // (normalizes `.` / `..` segments). The sep suffix prevents foo/bar from
-      // matching foo/barbaz. Note: resolve() does not dereference symlinks —
-      // a symlink inside outputPath pointing outside is not caught here.
-      const normalizedOutput = outputPath.endsWith(sep) ? outputPath : outputPath + sep;
-      if (!filePath.startsWith(normalizedOutput)) {
+      // Path traversal protection: filePath is built from the resolved output
+      // dir; the prefix check catches `..` segments and directory-level symlinks.
+      // Also check whether the file itself is a symlink escaping the output dir
+      // (e.g. an attacker pre-created a symlink at the expected output path).
+      let realFilePath = filePath;
+      if (existsSync(filePath)) {
+        try { realFilePath = realpathSync(filePath); } catch { /* keep logical path */ }
+      }
+      if (!realFilePath.startsWith(normalizedOutput)) {
         console.warn('Skipping file outside output directory: %s', filePath);
         continue;
       }
