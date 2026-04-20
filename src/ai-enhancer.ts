@@ -182,6 +182,13 @@ export class AIEnhancer {
     return results;
   }
 
+  private _annotationsAreDefault(annotations: ScannedModule['annotations']): boolean {
+    if (annotations == null) return true;
+    const ann = annotations as unknown as Record<string, unknown>;
+    const def = DEFAULT_ANNOTATIONS as unknown as Record<string, unknown>;
+    return Object.keys(def).every((k) => ann[k] === def[k]);
+  }
+
   private _identifyGaps(module: ScannedModule): string[] {
     const gaps: string[] = [];
     if (!module.description || module.description === module.moduleId) {
@@ -190,7 +197,7 @@ export class AIEnhancer {
     if (!module.documentation) {
       gaps.push('documentation');
     }
-    if (module.annotations == null || Object.keys(DEFAULT_ANNOTATIONS).every(k => (module.annotations as unknown as Record<string, unknown>)[k] === (DEFAULT_ANNOTATIONS as unknown as Record<string, unknown>)[k])) {
+    if (this._annotationsAreDefault(module.annotations)) {
       gaps.push('annotations');
     }
     const props = (module.inputSchema as Record<string, unknown>).properties;
