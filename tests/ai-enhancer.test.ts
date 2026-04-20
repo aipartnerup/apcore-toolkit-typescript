@@ -46,6 +46,38 @@ describe('AIEnhancer', () => {
     });
   });
 
+  describe('enhance failure path (D8-1 regression)', () => {
+    it('returns original module and warns when _callLLM throws', async () => {
+      process.env.APCORE_AI_ENABLED = 'true';
+      const mod = createScannedModule({
+        moduleId: 'fail.module',
+        description: 'fail.module',
+        inputSchema: { type: 'object' },
+        outputSchema: { type: 'object' },
+        tags: [],
+        target: 'fail:fn',
+      });
+
+      const enhancer = new AIEnhancer();
+      const callLLM = vi
+        .spyOn(enhancer as unknown as { _callLLM: (p: string) => Promise<string> }, '_callLLM')
+        .mockRejectedValue(new Error('SLM unreachable'));
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const [result] = await enhancer.enhance([mod]);
+
+      expect(result).toBe(mod); // original returned unchanged
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('AIEnhancer'),
+        expect.stringContaining('fail.module'),
+        expect.stringContaining('SLM unreachable'),
+      );
+
+      callLLM.mockRestore();
+      warnSpy.mockRestore();
+    });
+  });
+
   describe('constructor', () => {
     it('uses defaults when no options or env vars', () => {
       const enhancer = new AIEnhancer();

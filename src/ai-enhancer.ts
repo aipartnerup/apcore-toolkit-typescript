@@ -169,8 +169,12 @@ export class AIEnhancer {
         try {
           const enhanced = await this._enhanceModule(module, gaps);
           results[idx] = enhanced;
-        } catch {
-          // AI enhancement failed — keep original
+        } catch (err) {
+          console.warn(
+            'AIEnhancer: enhancement failed for %s: %s',
+            module.moduleId,
+            err instanceof Error ? err.message : String(err),
+          );
         }
       }
     }
