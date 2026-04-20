@@ -44,6 +44,7 @@ export function deepResolveRefs(
   depth = 0,
 ): Record<string, unknown> {
   if (depth > 16) {
+    console.warn('deepResolveRefs: max depth reached; returning schema as-is');
     return schema;
   }
 
@@ -83,8 +84,9 @@ export function deepResolveRefs(
     result["properties"] !== null
   ) {
     const props = result["properties"] as Record<string, Record<string, unknown>>;
-    const resolvedProps: Record<string, unknown> = {};
+    const resolvedProps: Record<string, unknown> = Object.create(null);
     for (const [k, v] of Object.entries(props)) {
+      if (PROTO_DENY_LIST.has(k)) continue;
       resolvedProps[k] = deepResolveRefs(v, openapiDoc, depth + 1);
     }
     result["properties"] = resolvedProps;
@@ -131,7 +133,7 @@ export function extractInputSchema(
         schema.properties[k] = v;
       }
     }
-    schema.required.push(...bodyRequired);
+    schema.required.push(...bodyRequired.filter(r => typeof r === 'string' && !PROTO_DENY_LIST.has(r)));
   }
 
   // Recursively resolve $ref inside individual properties
@@ -153,8 +155,12 @@ export function extractOutputSchema(
 ): Record<string, unknown> {
   const responses = (operation["responses"] ?? {}) as Record<string, unknown>;
 
-  for (const statusCode of ["200", "201"]) {
-    const response = (responses[statusCode] ?? {}) as Record<string, unknown>;
+  const successCodes = Object.keys(responses).filter(
+    k => /^2\d\d$/.test(k),
+  ).sort();
+
+  for (const statusCode of successCodes) {
+    const response = responses[statusCode] as Record<string, unknown>;
     const content = (response["content"] ?? {}) as Record<string, unknown>;
     const jsonContent = (content["application/json"] ?? {}) as Record<string, unknown>;
 

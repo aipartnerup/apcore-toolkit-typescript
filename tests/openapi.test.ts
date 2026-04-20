@@ -451,3 +451,73 @@ describe("extractInputSchema — prototype pollution guard", () => {
     expect(props.normal).toEqual({ type: "number" });
   });
 });
+
+// C2 regression: deepResolveRefs must use null-prototype object + deny-list
+describe("deepResolveRefs — prototype pollution guard", () => {
+  it("does not pollute Object.prototype via __proto__ property key in schema", () => {
+    const doc = {
+      components: { schemas: { Bad: { type: "object", properties: { __proto__: { type: "string" } } } } },
+    };
+    const schema = { $ref: "#/components/schemas/Bad" };
+    deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    expect((Object.prototype as Record<string, unknown>).type).toBeUndefined();
+  });
+
+  it("skips constructor and prototype property keys in resolved properties", () => {
+    const doc = {
+      components: {
+        schemas: {
+          Evil: { type: "object", properties: { constructor: { type: "string" }, valid: { type: "number" } } },
+        },
+      },
+    };
+    const schema = { $ref: "#/components/schemas/Evil" };
+    const result = deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    const props = (result as Record<string, Record<string, unknown>>).properties;
+    expect(Object.prototype.hasOwnProperty.call(props, "constructor")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(props, "valid")).toBe(true);
+  });
+});
+
+// W7 regression: extractOutputSchema should cover full 2xx range
+describe("extractOutputSchema — 2xx range", () => {
+  it("returns schema from 204 response when 200/201 are absent", () => {
+    const op = {
+      responses: {
+        "204": {
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { ok: { type: "boolean" } } },
+            },
+          },
+        },
+      },
+    };
+    const result = extractOutputSchema(op as Record<string, unknown>);
+    const props = (result as Record<string, Record<string, unknown>>).properties;
+    expect(props).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(props, "ok")).toBe(true);
+  });
+});
+
+// W8 regression: bodyRequired must filter proto keys and non-strings
+describe("extractInputSchema — bodyRequired filtering", () => {
+  it("skips __proto__ entries in required array", () => {
+    const op = {
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: { name: { type: "string" } },
+              required: ["__proto__", "name"],
+            },
+          },
+        },
+      },
+    };
+    const schema = extractInputSchema(op as Record<string, unknown>);
+    expect(schema.required).not.toContain("__proto__");
+    expect(schema.required).toContain("name");
+  });
+});
