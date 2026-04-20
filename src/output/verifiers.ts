@@ -24,10 +24,15 @@ export class YAMLVerifier implements Verifier {
       if (!('bindings' in doc)) {
         return { ok: false, error: 'Missing required "bindings" key' };
       }
-      const first = (doc as any).bindings[0];
-      if (!first) return { ok: false, error: 'bindings array is empty' };
-      for (const field of ['module_id', 'target'] as const) {
-        if (!first[field]) return { ok: false, error: `Missing required field '${field}' in first binding` };
+      const bindings = (doc as Record<string, unknown>).bindings;
+      if (!Array.isArray(bindings) || bindings.length === 0) {
+        return { ok: false, error: 'bindings array is empty' };
+      }
+      for (let i = 0; i < bindings.length; i++) {
+        const entry = bindings[i] as Record<string, unknown>;
+        for (const field of ['module_id', 'target'] as const) {
+          if (!entry[field]) return { ok: false, error: `Missing required field '${field}' in binding[${i}]` };
+        }
       }
       return { ok: true };
     } catch (err) {

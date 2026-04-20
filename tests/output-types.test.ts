@@ -120,6 +120,23 @@ describe('YAMLVerifier', () => {
 
     rmSync(tmpDir, { recursive: true, force: true });
   });
+
+  it('fails when a non-first binding is missing required fields (D1-6 regression)', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'yaml-verifier-multi-'));
+    const filePath = join(tmpDir, 'multi.yaml');
+    writeFileSync(
+      filePath,
+      'bindings:\n  - module_id: ok\n    target: http://host/fn\n  - module_id: bad\n',
+      'utf-8',
+    );
+
+    const verifier = new YAMLVerifier();
+    const result = verifier.verify(filePath, 'ok');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('target');
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
 });
 
 describe('SyntaxVerifier', () => {
