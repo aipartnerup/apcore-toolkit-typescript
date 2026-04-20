@@ -83,6 +83,16 @@ describe('TypeScriptWriter', () => {
     expect(writtenContent).toContain("import { module } from 'apcore-js';");
   });
 
+  it('generated code uses Type.Unsafe() from @sinclair/typebox for schemas (D1-3 regression)', () => {
+    const mod = makeModule();
+    writer.write([mod], '/tmp/out');
+
+    const writtenContent = (fs.writeFileSync as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(writtenContent).toContain("import { Type } from '@sinclair/typebox';");
+    expect(writtenContent).toContain('inputSchema: Type.Unsafe(');
+    expect(writtenContent).toContain('outputSchema: Type.Unsafe(');
+  });
+
   it('code contains proper id, description, tags, version', () => {
     const mod = makeModule();
     writer.write([mod], '/tmp/out');

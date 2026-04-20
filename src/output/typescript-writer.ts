@@ -88,12 +88,13 @@ export class TypeScriptWriter {
     lines.push('// Do not edit manually unless you intend to customize behavior.');
     lines.push('');
     lines.push("import { module } from 'apcore-js';");
+    lines.push("import { Type } from '@sinclair/typebox';");
     lines.push('');
     lines.push('export default module({');
     lines.push(`  id: ${JSON.stringify(mod.moduleId)},`);
     lines.push(`  description: ${JSON.stringify(mod.description)},`);
-    lines.push(`  inputSchema: ${JSON.stringify(mod.inputSchema)},`);
-    lines.push(`  outputSchema: ${JSON.stringify(mod.outputSchema)},`);
+    lines.push(`  inputSchema: Type.Unsafe(${JSON.stringify(mod.inputSchema)}),`);
+    lines.push(`  outputSchema: Type.Unsafe(${JSON.stringify(mod.outputSchema)}),`);
     lines.push(`  tags: ${JSON.stringify([...mod.tags])},`);
     lines.push(`  version: ${JSON.stringify(mod.version)},`);
 
