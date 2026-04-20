@@ -21,13 +21,19 @@ export function enrichSchemaDescriptions(
   }
 
   const overwrite = options?.overwrite ?? false;
-  const result = structuredClone(schema);
-  const resultProps = result.properties as Record<
-    string,
-    Record<string, unknown>
-  >;
+  let result: Record<string, unknown>;
+  try {
+    result = structuredClone(schema);
+  } catch (err) {
+    throw new Error(
+      `enrichSchemaDescriptions: schema is not cloneable — ${(err as Error).message}`,
+      { cause: err },
+    );
+  }
+  const resultProps = result.properties as Record<string, Record<string, unknown>>;
 
   for (const [name, desc] of Object.entries(paramDescriptions)) {
+    if (name === '__proto__' || name === 'constructor' || name === 'prototype') continue;
     if (name in resultProps) {
       const prop = resultProps[name];
       if (overwrite || !("description" in prop)) {

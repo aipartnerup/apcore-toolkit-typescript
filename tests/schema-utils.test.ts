@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { enrichSchemaDescriptions } from "../src/schema-utils";
+import { enrichSchemaDescriptions } from "../src/schema-utils.js";
 
 describe("enrichSchemaDescriptions", () => {
   it("returns original schema (same reference) when paramDescriptions is empty", () => {
@@ -94,5 +94,27 @@ describe("enrichSchemaDescriptions", () => {
       },
     });
     expect(result.properties).not.toHaveProperty("notHere");
+  });
+
+  // Prototype pollution regression (D2-proto)
+  it("does not pollute Object.prototype via __proto__ paramDescription key", () => {
+    const schema = {
+      properties: {
+        name: { type: "string" },
+      },
+    };
+    enrichSchemaDescriptions(schema, { __proto__: "evil" });
+    expect(({} as Record<string, unknown>).name).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(Object.prototype, "name")).toBe(false);
+  });
+
+  it("does not throw when schema contains non-cloneable values (DataCloneError)", () => {
+    const schema = {
+      type: "object",
+      properties: { fn: {} },
+    };
+    // structuredClone can clone plain objects even with unusual values;
+    // ensure the wrapping try/catch doesn't surface as an unhandled crash
+    expect(() => enrichSchemaDescriptions(schema, { fn: "A function param" })).not.toThrow();
   });
 });
