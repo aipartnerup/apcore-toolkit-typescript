@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createAnnotations } from 'apcore-js';
+import { createAnnotations, DEFAULT_ANNOTATIONS } from 'apcore-js';
 import { AIEnhancer } from '../src/ai-enhancer.js';
 import { createScannedModule } from '../src/types.js';
 
@@ -219,6 +219,97 @@ describe('AIEnhancer', () => {
       expect(ann).not.toHaveProperty('cache_ttl');
       expect(ann).not.toHaveProperty('cache_key_fields');
       expect(ann).not.toHaveProperty('pagination_style');
+    });
+  });
+
+  // _annotationsAreDefault reference-equality regression (D6-annotations)
+  describe('_annotationsAreDefault reference equality fix', () => {
+    it('treats annotations with a different extra reference as default (gap IS detected)', async () => {
+      // Before the fix: `extra` reference differed → _annotationsAreDefault returned
+      // `false` (not-default) → gap skipped → SLM never called → annotations never enhanced.
+      // After the fix: `extra` is excluded from comparison → returns `true` (is-default)
+      // → gap IS detected → SLM IS called.
+      process.env.APCORE_AI_ENABLED = 'true';
+
+      const freshAnnotations = { ...DEFAULT_ANNOTATIONS, extra: {} };
+      const mod = createScannedModule({
+        moduleId: 'has-defaults',
+        description: 'a real description',
+        documentation: 'full docs',
+        inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
+        outputSchema: { type: 'object' },
+        tags: [],
+        target: 'mod:fn',
+        annotations: freshAnnotations,
+      });
+
+      const enhancer = new AIEnhancer();
+      const callLLM = vi
+        .spyOn(enhancer as unknown as { _callLLM: (p: string) => Promise<string> }, '_callLLM')
+        .mockResolvedValue('{"confidence":{}}');
+
+      await enhancer.enhance([mod]);
+
+      // With the fix applied, annotations ARE detected as default and the gap
+      // IS pushed, causing _callLLM to be invoked.
+      expect(callLLM).toHaveBeenCalledOnce();
+
+      callLLM.mockRestore();
+    });
+
+    it('does not detect an annotation gap when annotations have a non-default value', async () => {
+      // A module with at least one custom annotation should NOT get an annotation gap.
+      process.env.APCORE_AI_ENABLED = 'true';
+
+      const customAnnotations = { ...DEFAULT_ANNOTATIONS, extra: {}, readonly: true };
+      const mod = createScannedModule({
+        moduleId: 'has-custom',
+        description: 'a real description',
+        documentation: 'full docs',
+        inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
+        outputSchema: { type: 'object' },
+        tags: [],
+        target: 'mod:fn',
+        annotations: customAnnotations,
+      });
+
+      const enhancer = new AIEnhancer();
+      const callLLM = vi
+        .spyOn(enhancer as unknown as { _callLLM: (p: string) => Promise<string> }, '_callLLM')
+        .mockResolvedValue('{"confidence":{}}');
+
+      await enhancer.enhance([mod]);
+
+      // readonly: true diverges from DEFAULT_ANNOTATIONS.readonly = false
+      // so _annotationsAreDefault returns false → no annotation gap → _callLLM not called
+      expect(callLLM).not.toHaveBeenCalled();
+
+      callLLM.mockRestore();
+    });
+  });
+
+  // _parseResponse fence-stripping regression
+  describe('_parseResponse fence stripping', () => {
+    const parse = (AIEnhancer as unknown as { _parseResponse: (r: string) => Record<string, unknown> })._parseResponse.bind(AIEnhancer);
+
+    it('parses plain JSON without fence', () => {
+      expect(parse('{"a":1}')).toEqual({ a: 1 });
+    });
+
+    it('strips ```json...``` fence', () => {
+      expect(parse('```json\n{"a":1}\n```')).toEqual({ a: 1 });
+    });
+
+    it('strips ``` fence without language specifier', () => {
+      expect(parse('```\n{"a":1}\n```')).toEqual({ a: 1 });
+    });
+
+    it('strips fence without closing backticks', () => {
+      expect(parse('```json\n{"a":1}')).toEqual({ a: 1 });
+    });
+
+    it('throws on bare triple-backtick (no content)', () => {
+      expect(() => parse('```')).toThrow('SLM returned invalid JSON');
     });
   });
 });

@@ -186,7 +186,14 @@ export class AIEnhancer {
     if (annotations == null) return true;
     const ann = annotations as unknown as Record<string, unknown>;
     const def = DEFAULT_ANNOTATIONS as unknown as Record<string, unknown>;
-    return Object.keys(def).every((k) => ann[k] === def[k]);
+    return Object.keys(def).every((k) => {
+      // `extra` is an object type whose default is Object.freeze({}). Reference
+      // equality always fails after cloning, producing spurious SLM calls.
+      // The SLM never populates `extra` (excluded from ANNOTATION_FIELD_SPECS),
+      // so we skip it here to avoid false "not at default" readings.
+      if (k === 'extra') return true;
+      return ann[k] === def[k];
+    });
   }
 
   private _identifyGaps(module: ScannedModule): string[] {
@@ -263,8 +270,12 @@ export class AIEnhancer {
     if (gaps.includes('input_schema') && parsed.input_schema) {
       const conf = parsedConf.input_schema ?? 0;
       confidence.input_schema = conf;
-      if (conf >= this.threshold) {
-        updates.inputSchema = parsed.input_schema;
+      const s = parsed.input_schema;
+      const isValidShape = typeof s === 'object' && !Array.isArray(s) && s !== null && 'type' in (s as object);
+      if (!isValidShape) {
+        warnings.push('SLM returned malformed input_schema (missing "type") — skipped. Review manually.');
+      } else if (conf >= this.threshold) {
+        updates.inputSchema = s;
       } else {
         warnings.push(`Low confidence (${conf.toFixed(2)}) for input_schema — skipped. Review manually.`);
       }
@@ -382,11 +393,19 @@ export class AIEnhancer {
 
   private static _parseResponse(response: string): Record<string, unknown> {
     let text = response.trim();
+    // Strip markdown code fence: ```[lang]\n ... \n``` (closing fence optional)
     if (text.startsWith('```')) {
-      const lines = text.split('\n');
-      if (lines[0].startsWith('```')) lines.shift();
-      if (lines.length > 0 && lines[lines.length - 1].trim() === '```') lines.pop();
-      text = lines.join('\n');
+      const firstNl = text.indexOf('\n');
+      if (firstNl === -1) {
+        text = '';
+      } else {
+        text = text.slice(firstNl + 1);
+        if (text.endsWith('```')) {
+          const lastNl = text.lastIndexOf('\n');
+          text = lastNl === -1 ? '' : text.slice(0, lastNl);
+        }
+        text = text.trim();
+      }
     }
     try {
       return JSON.parse(text) as Record<string, unknown>;
