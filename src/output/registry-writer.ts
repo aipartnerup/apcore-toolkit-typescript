@@ -5,6 +5,7 @@ import type { ScannedModule } from '../types.js';
 import type { WriteResult } from './types.js';
 import { createWriteResult } from './types.js';
 import { RegistryVerifier } from './verifiers.js';
+import { WriteError } from './errors.js';
 import { applyVerification } from './base-writer.js';
 import type { BaseWriteOptions } from './base-writer.js';
 
@@ -44,7 +45,11 @@ export class RegistryWriter {
         continue;
       }
       const fm = await this._toFunctionModule(mod, allowedPrefixes);
-      registry.register(mod.moduleId, fm);
+      try {
+        registry.register(mod.moduleId, fm);
+      } catch (err) {
+        throw new WriteError(mod.moduleId, err as Error);
+      }
 
       const result = applyVerification(
         createWriteResult(mod.moduleId, null),

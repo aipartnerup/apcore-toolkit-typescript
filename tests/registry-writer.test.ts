@@ -136,4 +136,21 @@ describe('RegistryWriter', () => {
       ]);
     });
   });
+
+  // registry.register() throws regression (D3-register)
+  describe('registry.register() error handling', () => {
+    it('throws WriteError when registry.register() throws', async () => {
+      const writer = new RegistryWriter();
+      const mod = createScannedModule({ ...REQUIRED_FIELDS });
+      const registry = {
+        register(_id: string, _module: unknown) {
+          throw new Error('duplicate module id');
+        },
+      };
+
+      const { WriteError } = await import('../src/output/errors.js');
+      await expect(writer.write([mod], registry)).rejects.toThrow(WriteError);
+      await expect(writer.write([mod], registry)).rejects.toThrow('duplicate module id');
+    });
+  });
 });
