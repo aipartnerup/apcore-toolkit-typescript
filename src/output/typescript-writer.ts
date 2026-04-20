@@ -1,10 +1,12 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, sep } from 'node:path';
 import type { ScannedModule } from '../types.js';
-import type { WriteResult, Verifier } from './types.js';
+import type { WriteResult } from './types.js';
 import { createWriteResult } from './types.js';
 import { WriteError } from './errors.js';
-import { SyntaxVerifier, runVerifierChain } from './verifiers.js';
+import { SyntaxVerifier } from './verifiers.js';
+import { applyVerification } from './base-writer.js';
+import type { FileWriteOptions } from './base-writer.js';
 
 /**
  * Write scanned modules as TypeScript source files.
@@ -21,7 +23,7 @@ export class TypeScriptWriter {
   write(
     modules: ScannedModule[],
     outputDir: string,
-    options?: { dryRun?: boolean; verify?: boolean; verifiers?: Verifier[]; errorMode?: 'throw' | 'collect' },
+    options?: FileWriteOptions,
   ): WriteResult[] {
     const dryRun = options?.dryRun ?? false;
     const shouldVerify = options?.verify ?? false;
@@ -65,19 +67,14 @@ export class TypeScriptWriter {
         throw new WriteError(filePath, err as Error);
       }
 
-      let result = createWriteResult(mod.moduleId, filePath);
-      if (shouldVerify) {
-        const builtinResult = new SyntaxVerifier().verify(filePath, mod.moduleId);
-        if (!builtinResult.ok) {
-          result = createWriteResult(mod.moduleId, filePath, false, builtinResult.error ?? null);
-        }
-      }
-      if (result.verified && verifiers.length > 0) {
-        const vResult = runVerifierChain(verifiers, filePath, mod.moduleId);
-        if (!vResult.ok) {
-          result = createWriteResult(mod.moduleId, filePath, false, vResult.error ?? null);
-        }
-      }
+      const result = applyVerification(
+        createWriteResult(mod.moduleId, filePath),
+        new SyntaxVerifier(),
+        verifiers,
+        filePath,
+        mod.moduleId,
+        shouldVerify,
+      );
       results.push(result);
     }
 

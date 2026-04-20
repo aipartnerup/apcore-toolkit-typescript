@@ -3,10 +3,12 @@ import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, join, sep } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import { annotationsToDict } from '../serializers.js';
-import type { WriteResult, Verifier } from './types.js';
+import type { WriteResult } from './types.js';
 import { createWriteResult } from './types.js';
 import { WriteError } from './errors.js';
-import { YAMLVerifier, runVerifierChain } from './verifiers.js';
+import { YAMLVerifier } from './verifiers.js';
+import { applyVerification } from './base-writer.js';
+import type { FileWriteOptions } from './base-writer.js';
 
 /**
  * Write scanned modules as YAML binding files.
@@ -27,7 +29,7 @@ export class YAMLWriter {
   write(
     modules: ScannedModule[],
     outputDir: string,
-    options?: { dryRun?: boolean; verify?: boolean; verifiers?: Verifier[]; errorMode?: 'throw' | 'collect' },
+    options?: FileWriteOptions,
   ): WriteResult[] {
     const dryRun = options?.dryRun ?? false;
     const shouldVerify = options?.verify ?? false;
@@ -94,19 +96,14 @@ export class YAMLWriter {
         throw new WriteError(filePath, err as Error);
       }
 
-      let result = createWriteResult(module.moduleId, filePath);
-      if (shouldVerify) {
-        const builtinResult = new YAMLVerifier().verify(filePath, module.moduleId);
-        if (!builtinResult.ok) {
-          result = createWriteResult(module.moduleId, filePath, false, builtinResult.error ?? null);
-        }
-      }
-      if (result.verified && verifiers.length > 0) {
-        const vResult = runVerifierChain(verifiers, filePath, module.moduleId);
-        if (!vResult.ok) {
-          result = createWriteResult(module.moduleId, filePath, false, vResult.error ?? null);
-        }
-      }
+      const result = applyVerification(
+        createWriteResult(module.moduleId, filePath),
+        new YAMLVerifier(),
+        verifiers,
+        filePath,
+        module.moduleId,
+        shouldVerify,
+      );
       results.push(result);
     }
 

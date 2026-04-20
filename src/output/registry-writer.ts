@@ -2,9 +2,11 @@ import { FunctionModule, jsonSchemaToTypeBox } from 'apcore-js';
 import type { Context, ModuleExample } from 'apcore-js';
 import { resolveTarget } from '../resolve-target.js';
 import type { ScannedModule } from '../types.js';
-import type { WriteResult, Verifier } from './types.js';
+import type { WriteResult } from './types.js';
 import { createWriteResult } from './types.js';
-import { RegistryVerifier, runVerifierChain } from './verifiers.js';
+import { RegistryVerifier } from './verifiers.js';
+import { applyVerification } from './base-writer.js';
+import type { BaseWriteOptions } from './base-writer.js';
 
 /**
  * Write scanned modules to an apcore-js registry.
@@ -29,7 +31,7 @@ export class RegistryWriter {
   async write(
     modules: ScannedModule[],
     registry: { register(moduleId: string, module: unknown): void; getModule?(id: string): unknown },
-    options?: { dryRun?: boolean; verify?: boolean; verifiers?: Verifier[]; allowedPrefixes?: string[] },
+    options?: BaseWriteOptions & { allowedPrefixes?: string[] },
   ): Promise<WriteResult[]> {
     const shouldVerify = options?.verify ?? false;
     const verifiers = options?.verifiers ?? [];
@@ -44,19 +46,14 @@ export class RegistryWriter {
       const fm = await this._toFunctionModule(mod, allowedPrefixes);
       registry.register(mod.moduleId, fm);
 
-      let result = createWriteResult(mod.moduleId, null);
-      if (shouldVerify) {
-        const builtinResult = new RegistryVerifier(registry).verify('', mod.moduleId);
-        if (!builtinResult.ok) {
-          result = createWriteResult(mod.moduleId, null, false, builtinResult.error ?? null);
-        }
-      }
-      if (result.verified && verifiers.length > 0) {
-        const vResult = runVerifierChain(verifiers, '', mod.moduleId);
-        if (!vResult.ok) {
-          result = createWriteResult(mod.moduleId, null, false, vResult.error ?? null);
-        }
-      }
+      const result = applyVerification(
+        createWriteResult(mod.moduleId, null),
+        new RegistryVerifier(registry),
+        verifiers,
+        '',
+        mod.moduleId,
+        shouldVerify,
+      );
       results.push(result);
     }
     return results;
