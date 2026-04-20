@@ -257,10 +257,21 @@ describe('BindingLoader.load (filesystem)', () => {
     expect(() => loader.load(join(tmpDir, 'nope'))).toThrow(/does not exist/);
   });
 
-  it('throws on malformed YAML', () => {
+  it('throws on malformed YAML with "parse YAML" reason (D8-2)', () => {
     const f = join(tmpDir, 'bad.binding.yaml');
     writeFileSync(f, '::: not yaml :::\n  - [');
     expect(() => loader.load(f)).toThrow(/parse YAML/);
+  });
+
+  it('throws on unreadable file with "read file" reason, distinct from parse error (D8-2)', () => {
+    const f = join(tmpDir, 'unreadable.binding.yaml');
+    writeFileSync(f, 'bindings: []');
+    chmodSync(f, 0o000);
+    try {
+      expect(() => loader.load(f)).toThrow(/read file/);
+    } finally {
+      chmodSync(f, 0o644);
+    }
   });
 
   it('skips empty files', () => {

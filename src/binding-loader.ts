@@ -124,9 +124,18 @@ export class BindingLoader {
 
     const modules: ScannedModule[] = [];
     for (const f of files) {
+      let content: string;
+      try {
+        content = fs.readFileSync(f, 'utf-8');
+      } catch (exc) {
+        throw new BindingLoadError({
+          reason: `failed to read file: ${(exc as Error).message}`,
+          filePath: f,
+        });
+      }
       let raw: unknown;
       try {
-        raw = yaml.load(fs.readFileSync(f, 'utf-8'));
+        raw = yaml.load(content);
       } catch (exc) {
         throw new BindingLoadError({
           reason: `failed to parse YAML: ${(exc as Error).message}`,
