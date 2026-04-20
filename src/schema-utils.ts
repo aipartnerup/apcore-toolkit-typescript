@@ -34,7 +34,7 @@ export function enrichSchemaDescriptions(
 
   for (const [name, desc] of Object.entries(paramDescriptions)) {
     if (name === '__proto__' || name === 'constructor' || name === 'prototype') continue;
-    if (name in resultProps) {
+    if (Object.prototype.hasOwnProperty.call(resultProps, name)) {
       const prop = resultProps[name];
       if (overwrite || !("description" in prop)) {
         prop.description = desc;
