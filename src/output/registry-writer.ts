@@ -29,10 +29,11 @@ export class RegistryWriter {
   async write(
     modules: ScannedModule[],
     registry: { register(moduleId: string, module: unknown): void; getModule?(id: string): unknown },
-    options?: { dryRun?: boolean; verify?: boolean; verifiers?: Verifier[] },
+    options?: { dryRun?: boolean; verify?: boolean; verifiers?: Verifier[]; allowedPrefixes?: string[] },
   ): Promise<WriteResult[]> {
     const shouldVerify = options?.verify ?? false;
     const verifiers = options?.verifiers ?? [];
+    const allowedPrefixes = options?.allowedPrefixes;
     const results: WriteResult[] = [];
 
     for (const mod of modules) {
@@ -40,7 +41,7 @@ export class RegistryWriter {
         results.push(createWriteResult(mod.moduleId, null));
         continue;
       }
-      const fm = await this._toFunctionModule(mod);
+      const fm = await this._toFunctionModule(mod, allowedPrefixes);
       registry.register(mod.moduleId, fm);
 
       let result = createWriteResult(mod.moduleId, null);
@@ -61,8 +62,8 @@ export class RegistryWriter {
     return results;
   }
 
-  private async _toFunctionModule(mod: ScannedModule): Promise<FunctionModule> {
-    const targetFn = (await resolveTarget(mod.target)) as (
+  private async _toFunctionModule(mod: ScannedModule, allowedPrefixes?: string[]): Promise<FunctionModule> {
+    const targetFn = (await resolveTarget(mod.target, allowedPrefixes)) as (
       inputs: Record<string, unknown>,
     ) => unknown;
 
