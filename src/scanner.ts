@@ -33,7 +33,7 @@ export abstract class BaseScanner {
 
     // Extract JSDoc-style documentation from function's toString representation
     const source = func.toString();
-    const jsdocMatch = source.match(/\/\*\*([\s\S]*?)\*\//);
+    const jsdocMatch = source.match(/^\/\*\*([\s\S]*?)\*\//);
     if (!jsdocMatch) {
       return { description: null, documentation: null, params: {} };
     }

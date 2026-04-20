@@ -165,6 +165,16 @@ describe('BaseScanner', () => {
       const result = scanner.extractDocstring(fn);
       expect(result.description).toBeNull();
     });
+
+    it('ignores JSDoc buried inside the function body (D1-7 regression)', () => {
+      // esbuild strips comments at transform time, so we simulate via toString override
+      const fn = () => 42;
+      Object.defineProperty(fn, 'toString', {
+        value: () => 'function fn() {\n  /** buried doc */\n  return 42;\n}',
+      });
+      const result = scanner.extractDocstring(fn);
+      expect(result.description).toBeNull();
+    });
   });
 
   describe('deduplicateIds', () => {
