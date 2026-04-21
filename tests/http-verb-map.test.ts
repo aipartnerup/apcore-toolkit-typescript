@@ -4,9 +4,11 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   SCANNER_VERB_MAP,
+  extractPathParamNames,
   generateSuggestedAlias,
   hasPathParams,
   resolveHttpVerb,
+  substitutePathParams,
 } from '../src/http-verb-map.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,6 +47,62 @@ describe('http-verb-map public API re-exports', () => {
   it('imports generateSuggestedAlias from package entry', async () => {
     const pkg = await import('../src/index.js');
     expect(pkg.generateSuggestedAlias('/tasks', 'POST')).toBe('tasks.create');
+  });
+
+  it('imports extractPathParamNames from package entry', async () => {
+    const pkg = await import('../src/index.js');
+    expect(pkg.extractPathParamNames('/users/{id}')).toEqual(new Set(['id']));
+  });
+
+  it('imports substitutePathParams from package entry', async () => {
+    const pkg = await import('../src/index.js');
+    expect(pkg.substitutePathParams('/users/{id}', { id: 42 })).toBe('/users/42');
+  });
+});
+
+describe('extractPathParamNames', () => {
+  it('returns empty set for static path', () => {
+    expect(extractPathParamNames('/tasks')).toEqual(new Set<string>());
+  });
+  it('extracts brace-style names', () => {
+    expect(extractPathParamNames('/users/{id}')).toEqual(new Set(['id']));
+  });
+  it('extracts colon-style names', () => {
+    expect(extractPathParamNames('/users/:id')).toEqual(new Set(['id']));
+  });
+  it('extracts multiple mixed-style names', () => {
+    expect(extractPathParamNames('/orgs/{org_id}/members/:member_id')).toEqual(
+      new Set(['org_id', 'member_id']),
+    );
+  });
+  it('deduplicates repeated names', () => {
+    expect(extractPathParamNames('/a/{id}/b/{id}')).toEqual(new Set(['id']));
+  });
+  it('ignores non-string input', () => {
+    expect(extractPathParamNames(undefined as unknown as string)).toEqual(new Set<string>());
+  });
+});
+
+describe('substitutePathParams', () => {
+  it('substitutes brace-style values', () => {
+    expect(substitutePathParams('/users/{id}', { id: 42 })).toBe('/users/42');
+  });
+  it('substitutes colon-style values', () => {
+    expect(substitutePathParams('/users/:id', { id: 'abc' })).toBe('/users/abc');
+  });
+  it('leaves unknown placeholders untouched', () => {
+    expect(substitutePathParams('/users/{id}/{role}', { id: 1 })).toBe('/users/1/{role}');
+  });
+  it('ignores extra keys', () => {
+    expect(substitutePathParams('/users/{id}', { id: 1, extra: 'x' })).toBe('/users/1');
+  });
+  it('returns original path if no placeholders', () => {
+    expect(substitutePathParams('/tasks', { id: 1 })).toBe('/tasks');
+  });
+  it('handles multiple placeholders of both styles', () => {
+    expect(substitutePathParams('/orgs/{org_id}/members/:m', { org_id: 7, m: 'me' })).toBe(
+      '/orgs/7/members/me',
+    );
   });
 });
 

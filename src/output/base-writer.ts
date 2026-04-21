@@ -1,3 +1,14 @@
+// Tri-language parity note
+// ------------------------
+// This file (`base-writer.ts`) and `factory.ts` expose shared write-option
+// shapes and a verify-chain helper as TypeScript-specific abstractions.
+// Python and Rust deliberately do not have equivalents: Python writers
+// accept **kwargs directly and Rust uses a format-variant enum returned
+// from `get_writer`. The TS pattern exists because structural typing
+// makes a shared options interface cheaper to maintain than per-writer
+// duplicates. Keep the surface internal to this subdirectory — avoid
+// re-exporting from the package entry point.
+
 import type { Verifier, VerifyResult, WriteResult } from './types.js';
 import { createWriteResult } from './types.js';
 import { runVerifierChain } from './verifiers.js';

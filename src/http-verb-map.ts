@@ -40,6 +40,12 @@ const PATH_PARAM_RE = new RegExp(_PATH_PARAM_CORE);
 const PATH_PARAM_FULL_RE = new RegExp(`^(?:${_PATH_PARAM_CORE})$`);
 
 /**
+ * Named-capture variant used by parameter extraction and substitution.
+ * Mirrors Python's `_PATH_PARAM_NAMED_RE`.
+ */
+const PATH_PARAM_NAMED_RE = new RegExp('\\{(?<brace>[^}]+)\\}|:(?<colon>[a-zA-Z_]\\w*)', 'g');
+
+/**
  * Check if a URL path contains path parameter placeholders.
  *
  * Detects both brace-style (`{param}`) and colon-style (`:param`) parameters,
@@ -65,7 +71,7 @@ export function hasPathParams(path: string): boolean {
  * @param pathHasParams - True if the corresponding route has path parameters.
  * @returns Semantic verb string (e.g., `"create"`, `"list"`, `"get"`).
  */
-import { PROTO_DENY as _PROTO_DENY } from './internal/safe-keys.js';
+import { PROTO_DENY as _PROTO_DENY } from './safe-keys.js';
 
 export function resolveHttpVerb(method: string, pathHasParams: boolean): string {
   if (typeof method !== 'string') return 'unknown';
@@ -104,6 +110,60 @@ export function resolveHttpVerb(method: string, pathHasParams: boolean): string 
  * @returns Dot-separated alias string. If the path has no non-parameter
  *   segments, returns just the semantic verb (e.g., `"list"`).
  */
+/**
+ * Return the set of parameter *names* declared in a URL path.
+ *
+ * Recognises both brace-style (`/users/{id}`) and colon-style
+ * (`/users/:id`) placeholders, so the output is consistent across
+ * frameworks that use different conventions.
+ *
+ * @param path - URL path string.
+ * @returns Set of parameter names with the surrounding punctuation stripped
+ *   (e.g., `new Set(["id", "org_id"])`).
+ */
+export function extractPathParamNames(path: string): Set<string> {
+  const names = new Set<string>();
+  if (typeof path !== 'string') return names;
+  PATH_PARAM_NAMED_RE.lastIndex = 0;
+  for (const match of path.matchAll(PATH_PARAM_NAMED_RE)) {
+    const name = match.groups?.brace ?? match.groups?.colon;
+    if (name) names.add(name);
+  }
+  return names;
+}
+
+/**
+ * Substitute `{name}` and `:name` placeholders with `values[name]`.
+ *
+ * Keys in `values` that do not appear as placeholders are ignored. A
+ * placeholder whose name is absent from `values` is left unchanged
+ * (callers can detect the leftover via {@link extractPathParamNames}).
+ *
+ * @param path - URL path with placeholders.
+ * @param values - Mapping from parameter name to substitution value.
+ * @returns Path with all matching placeholders replaced.
+ */
+export function substitutePathParams(path: string, values: Record<string, unknown>): string {
+  if (typeof path !== 'string') return path;
+  PATH_PARAM_NAMED_RE.lastIndex = 0;
+  const parts: string[] = [];
+  let lastIndex = 0;
+  for (const match of path.matchAll(PATH_PARAM_NAMED_RE)) {
+    const matchIndex = match.index ?? 0;
+    const whole = match[0];
+    const name = match.groups?.brace ?? match.groups?.colon;
+    parts.push(path.slice(lastIndex, matchIndex));
+    if (name && Object.prototype.hasOwnProperty.call(values, name)) {
+      parts.push(String(values[name]));
+    } else {
+      parts.push(whole);
+    }
+    lastIndex = matchIndex + whole.length;
+  }
+  parts.push(path.slice(lastIndex));
+  return parts.join('');
+}
+
 export function generateSuggestedAlias(path: string, method: string): string {
   if (typeof path !== 'string') return 'unknown';
   if (typeof method !== 'string') return 'unknown';

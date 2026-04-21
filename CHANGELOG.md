@@ -40,6 +40,28 @@
 
 - **`flattenParams`** — removed from README (Features list and API table). The symbol was advertised there but never exported from `src/index.ts`; the canonical docs previously described it as a TypeScript utility for "flattening Zod schemas", but TypeScript's native object-argument idiom (`function createUser(body: { username, email })`) already accepts flat inputs, making the wrapper a no-op. Users who need to iterate a Zod schema's fields at runtime can do so directly via `Object.keys(schema.shape)`. The Python `flatten_pydantic_params` remains and continues to serve Python's Pydantic-model unwrapping use-case.
 
+### Added (browser / edge runtime subpath)
+
+- **`apcore-toolkit/browser`** — new subpath export that exposes the runtime-neutral subset of the toolkit. Intended for consumers that bundle apcore-toolkit into a browser, edge runtime, or worker environment (e.g. `tiptap-apcore`). The default entry point continues to re-export the full Node-capable surface unchanged — this subpath is strictly additive; existing consumers (`nestjs-apcore` et al.) see zero API changes.
+  - Exposes: `ScannedModule` / `createScannedModule` / `cloneModule`, `BaseScanner`, the HTTP verb mapping helpers, `enrichSchemaDescriptions`, the OpenAPI resolvers (`resolveRef` / `resolveSchema` / `deepResolveRefs` / `extractInputSchema` / `extractOutputSchema`), the serializers (`annotationsToDict` / `moduleToDict` / `modulesToDicts`), `toMarkdown`, `BindingParser` / `parseBindingDocument` / `BindingLoadError`, the write-pipeline types (`WriteResult` / `VerifyResult` / `Verifier` / `createWriteResult` / `WriteError` / `InvalidFormatError`), `RegistryVerifier` / `runVerifierChain`, and `HTTPProxyRegistryWriter` / `HTTPProxyWriterError`.
+  - Excludes (Node-only): `YAMLWriter`, `TypeScriptWriter`, `RegistryWriter`, `getWriter`, `BindingLoader` (the fs-reading subclass — use `BindingParser` instead), `DisplayResolver`, `AIEnhancer`, `resolveTarget`, the file-based verifiers (`YAMLVerifier`, `SyntaxVerifier`, `MagicBytesVerifier`, `JSONVerifier`), and `VERSION`. These touch `node:fs` / `node:path` / `node:module` / `process.*` and cannot be safely bundled for browsers.
+- **`BindingParser`** — new class at `src/binding-parser.ts` that owns the runtime-neutral binding document parsing logic. `BindingLoader` is now a subclass that adds `load(filePath)` for filesystem loading. `BindingLoader.loadData(data)` continues to work unchanged (inherited). Mirrors the `load_data` split available on the Python `BindingLoader` class.
+- **`parseBindingDocument(raw, options?, filePath?)`** — standalone function form of `BindingParser.loadData`, with an optional explicit `filePath` for richer `BindingLoadError` messages when the document came from a known file location.
+- **`HTTPProxyRegistryWriter` documented in README API table** — previously shipped but undocumented. Uses only global `fetch` / `AbortController` / `URLSearchParams`; runs in any modern runtime.
+
+### Internal restructuring (no public API change)
+
+- **`src/output/verifiers.ts` split** — the runtime-neutral `RegistryVerifier` class and `runVerifierChain` function moved to a new `src/output/verify-core.ts`. `verifiers.ts` still re-exports them, so all existing imports (`nestjs-apcore`, the default package entry, internal consumers like `registry-writer.ts` and `base-writer.ts`) continue to resolve the same symbols from the same path. The split lets `apcore-toolkit/browser` import directly from `verify-core.ts` without pulling in the file-based verifiers' `node:fs` / `node:module` dependencies.
+- **`src/binding-loader.ts` split** — the class hierarchy is now `BindingLoader extends BindingParser`, with the pure parsing primitives and error / options types relocated to `src/binding-parser.ts`. `BindingLoader` retains its `load(filePath)` method and re-exports `BindingParser`, `parseBindingDocument`, `BindingLoadError`, and `BindingLoadOptions` so all existing import paths keep working.
+
+### Tests
+
+- +3 new tests in `tests/browser-entry.test.ts`:
+  1. The expected 30-symbol browser-safe surface is actually exported.
+  2. Node-only symbols (`YAMLWriter`, `BindingLoader`, `AIEnhancer`, `VERSION`, et al.) are **not** leaked into the subpath.
+  3. Static import-graph walker starts at `src/browser/index.ts` and recursively reads every relative import; fails if any file in the transitive graph references `node:*`, a bare Node builtin, `process.*`, or `createRequire`. This is the regression guard — any future change that accidentally pulls a Node dependency into the browser subpath will be blocked in CI.
+- Full suite: **457 tests across 22 files, all passing.**
+
 ## [0.4.0] - 2026-03-25
 
 ### Added

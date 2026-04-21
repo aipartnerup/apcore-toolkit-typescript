@@ -13,9 +13,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
-import type { ScannedModule } from './types.js';
-import { cloneModule } from './types.js';
-import { PROTO_DENY } from './internal/safe-keys.js';
+import type { ScannedModule } from '../types.js';
+import { cloneModule } from '../types.js';
+import { PROTO_DENY } from '../safe-keys.js';
 
 const MCP_ALIAS_MAX = 64;
 const MCP_ALIAS_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;

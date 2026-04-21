@@ -1,4 +1,4 @@
-import { PROTO_DENY } from './internal/safe-keys.js';
+import { PROTO_DENY } from './safe-keys.js';
 
 /**
  * Enrich a JSON Schema's property descriptions from an external map.

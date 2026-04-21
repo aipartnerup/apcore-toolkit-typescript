@@ -1,6 +1,6 @@
 // OpenAPI schema extraction utilities
 
-import { PROTO_DENY as PROTO_DENY_LIST } from './internal/safe-keys.js';
+import { PROTO_DENY as PROTO_DENY_LIST } from './safe-keys.js';
 
 export function resolveRef(
   refString: string,

@@ -16,9 +16,10 @@ npm install apcore-toolkit
 
 - Abstract `BaseScanner` for framework-specific endpoint scanning
 - OpenAPI schema extraction (`extractInputSchema`, `extractOutputSchema`)
-- Multi-format output writers (YAML, TypeScript, Registry) with pluggable verification
+- Multi-format output writers (YAML, TypeScript, Registry, HTTP-proxy) with pluggable verification
 - Markdown formatting with depth control and table heuristics
 - Module serialization utilities
+- Runtime-neutral subset via `apcore-toolkit/browser` for browser / edge / worker environments
 
 ## Usage
 
@@ -113,46 +114,97 @@ const dict = moduleToDict(mod);       // snake_case keys
 const dicts = modulesToDicts(modules); // batch conversion
 ```
 
+## Browser / edge runtime
+
+The default entry point (`apcore-toolkit`) targets Node: it exposes writers
+that touch the filesystem (`YAMLWriter`, `TypeScriptWriter`), a binding
+loader that reads from disk (`BindingLoader`), display / target resolvers,
+and the `VERSION` constant — all of which transitively pull in `node:fs`,
+`node:path`, `node:module`, or `process.*` and would break a browser
+bundle.
+
+For browser, edge-runtime, or worker consumers, `apcore-toolkit/browser`
+exports the runtime-neutral subset — schema / OpenAPI utilities, the
+abstract scanner, serializers, Markdown formatting, the binding **parser**
+(no filesystem access), the write-pipeline types, the runtime-neutral
+verifier primitives (`RegistryVerifier`, `runVerifierChain`), and the
+`HTTPProxyRegistryWriter` (uses only global `fetch` / `AbortController`).
+
+```typescript
+import {
+  BaseScanner,
+  BindingParser,
+  parseBindingDocument,
+  HTTPProxyRegistryWriter,
+  toMarkdown,
+} from 'apcore-toolkit/browser';
+
+// Parse a binding document fetched from a backend (no fs access).
+const resp   = await fetch('/api/bindings');
+const doc    = await resp.json();
+const modules = new BindingParser().loadData(doc);
+
+// Register each module as an HTTP proxy in an in-browser registry.
+const writer = new HTTPProxyRegistryWriter({ baseUrl: '/api' });
+await writer.write(modules, registry);
+```
+
+The default entry continues to re-export every symbol it always did (for
+tri-SDK parity with the Python and Rust toolkits and for unchanged behaviour
+in `nestjs-apcore` etc.). The `/browser` subpath is strictly additive — it
+exposes a subset of the same underlying classes, not a forked implementation.
+A static import-graph check in the test suite fails CI if any Node-only
+reference leaks into the subpath.
+
 ## API
 
-| Export | Description |
-|--------|-------------|
-| `ScannedModule` | Interface for scanned endpoint data |
-| `createScannedModule()` | Factory with defaults for optional fields |
-| `cloneModule()` | Defensive copy with optional overrides |
-| `BaseScanner` | Abstract base class for scanners |
-| `YAMLWriter` | Writes YAML binding files |
-| `BindingLoader` | Parses `.binding.yaml` files back into `ScannedModule` objects (pure-data inverse of `YAMLWriter`, with loose/strict modes) |
-| `BindingLoadError` | Error class raised when binding parsing fails; carries `filePath`, `moduleId`, `missingFields`, `reason` |
-| `TypeScriptWriter` | Generates TypeScript module wrappers |
-| `RegistryWriter` | Registers modules into an apcore Registry |
-| `getWriter()` | Factory for writer instances |
-| `extractInputSchema()` | Extract input schema from OpenAPI operation |
-| `extractOutputSchema()` | Extract output schema from OpenAPI operation |
-| `resolveRef()` | Resolve `$ref` in OpenAPI documents |
-| `resolveSchema()` | Resolve schema with single-level `$ref` support |
-| `deepResolveRefs()` | Recursively resolve all nested `$ref` pointers in a schema |
-| `enrichSchemaDescriptions()` | Merge parameter descriptions into schema |
-| `toMarkdown()` | Convert dict to formatted Markdown |
-| `moduleToDict()` | Serialize module to snake_case dict |
-| `modulesToDicts()` | Batch serialize modules |
-| `annotationsToDict()` | Convert annotations to plain dict |
-| `resolveTarget()` | Dynamic import + named export resolution (supports `allowedPrefixes` allowlist) |
-| `WriteResult` | Structured result type for writer operations |
-| `Verifier` | Interface for pluggable output verification |
-| `VerifyResult` | Result type for verification operations |
-| `WriteError` | Error class for I/O failures during write |
-| `YAMLVerifier` | Verifies YAML binding file structure |
-| `SyntaxVerifier` | Verifies file is non-empty and readable |
-| `RegistryVerifier` | Verifies module registered in registry |
-| `MagicBytesVerifier` | Verifies file header matches expected bytes |
-| `JSONVerifier` | Verifies valid JSON, optional schema check |
-| `createWriteResult()` | Factory for WriteResult with defaults |
-| `runVerifierChain()` | Run verifier chain, short-circuit on first failure |
-| `Enhancer` | Pluggable interface for metadata enhancement |
-| `AIEnhancer` | SLM-based metadata enhancement for scanned modules |
-| `DisplayResolver` | Sparse binding.yaml overlay — resolves alias, description, guidance, tags into `metadata["display"]` |
-| `VERSION` | Package version string |
+The **Browser** column marks whether a symbol is also re-exported from
+`apcore-toolkit/browser`. All symbols without a ✓ touch `node:fs`,
+`node:path`, `node:module`, or `process.*` and are Node-only.
+
+| Export | Browser | Description |
+|--------|:---:|-------------|
+| `ScannedModule` | ✓ | Interface for scanned endpoint data |
+| `createScannedModule()` | ✓ | Factory with defaults for optional fields |
+| `cloneModule()` | ✓ | Defensive copy with optional overrides |
+| `BaseScanner` | ✓ | Abstract base class for scanners |
+| `YAMLWriter` | | Writes YAML binding files |
+| `BindingLoader` | | Reads `.binding.yaml` files from disk and parses them back into `ScannedModule` objects. Subclass of `BindingParser`. |
+| `BindingParser` | ✓ | Runtime-neutral half of `BindingLoader`. `loadData(data)` parses an already-loaded binding document into `ScannedModule[]` — no filesystem access. |
+| `parseBindingDocument()` | ✓ | Standalone-function form of `BindingParser.loadData`, with an optional `filePath` for richer error messages. |
+| `BindingLoadError` | ✓ | Error class raised when binding parsing fails; carries `filePath`, `moduleId`, `missingFields`, `reason` |
+| `TypeScriptWriter` | | Generates TypeScript module wrappers |
+| `RegistryWriter` | | Registers modules into an apcore Registry |
+| `HTTPProxyRegistryWriter` | ✓ | Registers modules as HTTP-proxied entries in an in-memory registry. Each module's `execute()` forwards inputs to a backend URL via global `fetch`. Works in any runtime with `fetch` (Node 20+, browsers, edge, workers). |
+| `HTTPProxyWriterError` | ✓ | Error class thrown when HTTP fields cannot be extracted from a `ScannedModule` |
+| `getWriter()` | | Factory for writer instances |
+| `extractInputSchema()` | ✓ | Extract input schema from OpenAPI operation |
+| `extractOutputSchema()` | ✓ | Extract output schema from OpenAPI operation |
+| `resolveRef()` | ✓ | Resolve `$ref` in OpenAPI documents |
+| `resolveSchema()` | ✓ | Resolve schema with single-level `$ref` support |
+| `deepResolveRefs()` | ✓ | Recursively resolve all nested `$ref` pointers in a schema |
+| `enrichSchemaDescriptions()` | ✓ | Merge parameter descriptions into schema |
+| `toMarkdown()` | ✓ | Convert dict to formatted Markdown |
+| `moduleToDict()` | ✓ | Serialize module to snake_case dict |
+| `modulesToDicts()` | ✓ | Batch serialize modules |
+| `annotationsToDict()` | ✓ | Convert annotations to plain dict |
+| `resolveTarget()` | | Dynamic import + named export resolution (supports `allowedPrefixes` allowlist) |
+| `WriteResult` | ✓ | Structured result type for writer operations |
+| `Verifier` | ✓ | Interface for pluggable output verification |
+| `VerifyResult` | ✓ | Result type for verification operations |
+| `WriteError` | ✓ | Error class for I/O failures during write |
+| `InvalidFormatError` | ✓ | Error thrown by `getWriter` for unrecognised format names |
+| `YAMLVerifier` | | Verifies YAML binding file structure (reads file) |
+| `SyntaxVerifier` | | Verifies file is non-empty and parses as TypeScript (reads file) |
+| `RegistryVerifier` | ✓ | Verifies module registered in a registry (pure; no filesystem) |
+| `MagicBytesVerifier` | | Verifies file header matches expected bytes (reads file) |
+| `JSONVerifier` | | Verifies valid JSON, optional schema check (reads file) |
+| `createWriteResult()` | ✓ | Factory for WriteResult with defaults |
+| `runVerifierChain()` | ✓ | Run verifier chain, short-circuit on first failure |
+| `Enhancer` | | Pluggable interface for metadata enhancement |
+| `AIEnhancer` | | SLM-based metadata enhancement for scanned modules |
+| `DisplayResolver` | | Sparse binding.yaml overlay — resolves alias, description, guidance, tags into `metadata["display"]` |
+| `VERSION` | | Package version string |
 
 ## Documentation
 
