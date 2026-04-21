@@ -272,10 +272,15 @@ export class BindingLoader {
     const required: readonly string[] = strict
       ? [...LOOSE_REQUIRED, ...STRICT_EXTRA]
       : LOOSE_REQUIRED;
-    const missing = required.filter((f) => !(f in entry) || entry[f] == null);
+    // A required field is "missing or invalid" when absent, null, or of the
+    // wrong type. Previously only null/absent was rejected, so
+    // ``module_id: 42`` or ``target: true`` silently coerced to
+    // ``String(42) = "42"`` downstream and corrupted the registered module.
+    // This now matches the Rust loader's strict behaviour.
+    const missing = required.filter((f) => BindingLoader._isRequiredFieldInvalid(f, entry));
     if (missing.length > 0) {
       throw new BindingLoadError({
-        reason: 'missing required fields',
+        reason: 'missing or invalid required fields',
         filePath,
         moduleId: typeof entry['module_id'] === 'string' ? entry['module_id'] : null,
         missingFields: missing,
@@ -306,8 +311,31 @@ export class BindingLoader {
    * not a mapping (e.g. a string or array from user-edited YAML), emit a
    * warning and fall back to an empty record so the malformed data does not
    * silently persist through round-trip.
+   *
+   * Returned values are deep-cloned via ``structuredClone`` so later caller
+   * mutation of a ``ScannedModule.inputSchema/outputSchema/metadata`` cannot
+   * leak back into the parsed YAML source graph. Matches the Rust loader
+   * (``serde_json::Value.clone`` is deep) and the Python loader
+   * (``copy.deepcopy``).
    */
   private static readonly _PROTO_DENY = PROTO_DENY;
+
+  /**
+   * Return ``true`` when a required field is absent, null, or of the wrong
+   * type. Schema fields (``input_schema``, ``output_schema``) must be plain
+   * objects; other required fields (``module_id``, ``target``) must be
+   * non-empty strings.
+   */
+  private static _isRequiredFieldInvalid(field: string, entry: Record<string, unknown>): boolean {
+    if (!(field in entry)) return true;
+    const value = entry[field];
+    if (value == null) return true;
+    if (field === 'input_schema' || field === 'output_schema') {
+      return typeof value !== 'object' || Array.isArray(value);
+    }
+    // module_id, target — must be non-empty strings
+    return typeof value !== 'string' || value.length === 0;
+  }
 
   private _asRecord(value: unknown, fieldName: string, moduleId: string): Record<string, unknown> {
     if (value == null) return {};
@@ -316,7 +344,9 @@ export class BindingLoader {
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
         if (!BindingLoader._PROTO_DENY.has(k)) safe[k] = v;
       }
-      return safe;
+      // Deep-clone so caller mutation of nested values cannot leak back into
+      // the parsed YAML source graph.
+      return structuredClone(safe);
     }
     console.warn(
       `BindingLoader: ${fieldName} for module ${moduleId} is not a dict (${typeof value}); using empty {}`,

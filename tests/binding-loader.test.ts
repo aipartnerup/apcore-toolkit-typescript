@@ -82,6 +82,83 @@ describe('BindingLoader.loadData', () => {
     expect(() => loader.loadData({ bindings: [{ module_id: 'x' }] })).toThrow(BindingLoadError);
   });
 
+  it('rejects wrong-type module_id (regression: 42 must NOT coerce to "42")', () => {
+    // Previously Python/TypeScript silently coerced non-string scalars via
+    // String(value), while Rust rejected them. Same YAML must now behave
+    // identically across all three SDKs.
+    expect(() =>
+      loader.loadData({ bindings: [{ module_id: 42, target: 'pkg:func' }] }),
+    ).toThrow(BindingLoadError);
+    try {
+      loader.loadData({ bindings: [{ module_id: 42, target: 'pkg:func' }] });
+    } catch (exc) {
+      expect((exc as BindingLoadError).missingFields).toContain('module_id');
+    }
+  });
+
+  it('rejects wrong-type target (boolean)', () => {
+    expect(() =>
+      loader.loadData({ bindings: [{ module_id: 'x', target: true }] }),
+    ).toThrow(BindingLoadError);
+    try {
+      loader.loadData({ bindings: [{ module_id: 'x', target: true }] });
+    } catch (exc) {
+      expect((exc as BindingLoadError).missingFields).toContain('target');
+    }
+  });
+
+  it('rejects empty-string module_id (empty identifier is never valid)', () => {
+    try {
+      loader.loadData({ bindings: [{ module_id: '', target: 'pkg:func' }] });
+      expect.fail('expected BindingLoadError');
+    } catch (exc) {
+      expect(exc).toBeInstanceOf(BindingLoadError);
+      expect((exc as BindingLoadError).missingFields).toContain('module_id');
+    }
+  });
+
+  it('strict mode rejects non-object input_schema', () => {
+    const entry = {
+      module_id: 'x',
+      target: 'p:f',
+      input_schema: 'not a dict',
+      output_schema: { type: 'object' },
+    };
+    try {
+      loader.loadData({ bindings: [entry] }, { strict: true });
+      expect.fail('expected BindingLoadError');
+    } catch (exc) {
+      expect(exc).toBeInstanceOf(BindingLoadError);
+      expect((exc as BindingLoadError).missingFields).toContain('input_schema');
+    }
+  });
+
+  it('deep-clones inputSchema on load (regression: mutation must not leak)', () => {
+    // Previously `_asRecord` returned a fresh outer {} but shared nested refs
+    // with the parsed YAML. Mutating `m.inputSchema.properties.id.type`
+    // corrupted the original source dict.
+    const sourceSchema = {
+      type: 'object',
+      properties: { id: { type: 'integer' } },
+    } as Record<string, unknown>;
+    const entry = { module_id: 'x', target: 'p:f', input_schema: sourceSchema };
+    const m = loader.loadData({ bindings: [entry] })[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (m.inputSchema.properties as any).id.type = 'string';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((sourceSchema.properties as any).id.type).toBe('integer');
+  });
+
+  it('deep-clones metadata on load', () => {
+    const sourceMeta = { auth: { scope: ['admin', 'write'] } } as Record<string, unknown>;
+    const entry = { module_id: 'x', target: 'p:f', metadata: sourceMeta };
+    const m = loader.loadData({ bindings: [entry] })[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((m.metadata.auth as any).scope as string[]).push('leaked');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((sourceMeta.auth as any).scope).toEqual(['admin', 'write']);
+  });
+
   it('fails when bindings key missing', () => {
     expect(() => loader.loadData({ spec_version: '1.0' })).toThrow(/bindings/);
   });

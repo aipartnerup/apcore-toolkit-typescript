@@ -19,7 +19,6 @@ npm install apcore-toolkit
 - Multi-format output writers (YAML, TypeScript, Registry) with pluggable verification
 - Markdown formatting with depth control and table heuristics
 - Module serialization utilities
-- `flattenParams` for Zod-based parameter flattening
 
 ## Usage
 
@@ -138,8 +137,7 @@ const dicts = modulesToDicts(modules); // batch conversion
 | `moduleToDict()` | Serialize module to snake_case dict |
 | `modulesToDicts()` | Batch serialize modules |
 | `annotationsToDict()` | Convert annotations to plain dict |
-| `resolveTarget()` | Dynamic import + named export resolution |
-| `flattenParams()` | Flatten Zod schema params into keyword args |
+| `resolveTarget()` | Dynamic import + named export resolution (supports `allowedPrefixes` allowlist) |
 | `WriteResult` | Structured result type for writer operations |
 | `Verifier` | Interface for pluggable output verification |
 | `VerifyResult` | Result type for verification operations |

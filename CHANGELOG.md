@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.5.0] - 2026-04-19
+## [0.5.0] - 2026-04-21
 
 ### Added
 
@@ -30,6 +30,15 @@
 ### Hardening (post-review)
 
 - **`BindingLoader`**: `_asRecord` / `_asRecordOrNull` now warn when given a non-mapping value (previously silent). `_parseExamples` uses `structuredClone` on each entry so caller mutation of the returned `ScannedModule.examples` cannot leak into the YAML parser's object graph. `fs.statSync` failures are inspected for `ENOENT`/other `errno` codes so users see a specific error instead of a generic "path does not exist" for permission issues.
+
+### Hardening (cross-SDK sync — post-audit)
+
+- **`BindingLoader` strict-mode wrong-type rejection** — a required field is now rejected when absent, `null`, or of the wrong type (e.g. `module_id: 42`, `target: true`, empty-string `module_id`). Previously TypeScript silently coerced wrong-type scalars via `String(value)`, while Rust already rejected them; the same YAML now behaves identically in all three SDKs. The error reason widens from `"missing required fields"` to **`"missing or invalid required fields"`**, matching the Rust loader.
+- **`BindingLoader._asRecord` defensive deep-copy** — previously returned a fresh outer `{}` but shared nested refs with the parsed YAML source graph. Now `structuredClone`s the filtered result so caller mutation of `ScannedModule.inputSchema`/`outputSchema`/`metadata` does not leak back into the YAML parser's object graph (defensive parity with the Python `copy.deepcopy` and Rust `Value.clone` loaders).
+
+### Removed
+
+- **`flattenParams`** — removed from README (Features list and API table). The symbol was advertised there but never exported from `src/index.ts`; the canonical docs previously described it as a TypeScript utility for "flattening Zod schemas", but TypeScript's native object-argument idiom (`function createUser(body: { username, email })`) already accepts flat inputs, making the wrapper a no-op. Users who need to iterate a Zod schema's fields at runtime can do so directly via `Object.keys(schema.shape)`. The Python `flatten_pydantic_params` remains and continues to serve Python's Pydantic-model unwrapping use-case.
 
 ## [0.4.0] - 2026-03-25
 
