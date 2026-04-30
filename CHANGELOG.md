@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.1] - 2026-04-30
+
+### Fixed
+
+- **`package.json` `preinstall` hook removed** — the `npx only-allow pnpm` script was a development-time guardrail that also fired when downstream consumers installed `apcore-toolkit` as a dependency via npm or yarn, causing their installs to fail. The hook has been removed from the published package; pnpm enforcement remains in the monorepo root for internal development.
+
 ## [0.5.0] - 2026-04-21
 
 ### Added
