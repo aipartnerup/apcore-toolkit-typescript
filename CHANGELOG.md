@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`apcore-js` minimum version bumped from 0.19.0 to 0.20.0** — `package.json` `dependencies` now requires `apcore-js >=0.20.0`; `pnpm-lock.yaml` regenerated to `apcore-js@0.20.0`. Toolkit only imports stable apcore-js surface (`ModuleAnnotations`, `DEFAULT_ANNOTATIONS`, `ModuleExample`, `Context`, `FunctionModule`, `jsonSchemaToTypeBox`, `annotationsFromJSON`, `annotationsToJSON`); none of these were affected by 0.20.0 changes. Full vitest suite (490 passed) + `tsc --noEmit` clean against apcore-js 0.20.0.
+
 ### Added
 
 - **Surface-aware formatters** (refs aiperceivable/apcore-toolkit#13) — `formatModule`, `formatSchema`, `formatModules` for rendering `ScannedModule` and JSON Schema for specific consumer surfaces. Four styles for `formatModule`: `markdown` (LLM context), `skill` (drop-in `.claude/skills/<id>/SKILL.md` or `.gemini/skills/<id>/SKILL.md` body with minimal `name` + `description` frontmatter — no vendor-specific extensions), `table-row` (CLI listing), `json` (programmatic). `formatSchema` styles: `prose`, `table`, `json`. `formatModules` adds optional `groupBy: "tag" | "prefix"`. `display: true` (default) prefers the `ScannedModule.display` overlay over raw fields. Lives in `src/formatting/surface.ts`; re-exported from the top-level package.

@@ -54,7 +54,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "apcore-js": ">=0.19.0",
+    "apcore-js": ">=0.20.0",
     "js-yaml": "^4.1.0"
   },
   "peerDependencies": {
