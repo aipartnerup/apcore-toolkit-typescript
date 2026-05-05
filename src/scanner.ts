@@ -93,12 +93,32 @@ export abstract class BaseScanner {
     return result;
   }
 
+  /**
+   * Infer behavioural annotations from an HTTP method.
+   *
+   * Canonical mapping per
+   * `apcore-toolkit/docs/features/scanning.md` (RFC 9110 §9.2 safe-method
+   * semantics):
+   *   GET     → readonly=true, cacheable=true
+   *   HEAD    → readonly=true
+   *   OPTIONS → readonly=true
+   *   PUT     → idempotent=true
+   *   DELETE  → destructive=true
+   *   Others  → defaults (all false)
+   *
+   * HEAD and OPTIONS return readonly=true without cacheable=true: those
+   * methods are safe by spec but their responses are not generally cacheable
+   * for application-level use.
+   */
   static inferAnnotationsFromMethod(method: string): ModuleAnnotations {
     if (typeof method !== 'string') return { ...DEFAULT_ANNOTATIONS };
     const upper = method.toUpperCase();
 
     if (upper === 'GET') {
       return { ...DEFAULT_ANNOTATIONS, readonly: true, cacheable: true };
+    }
+    if (upper === 'HEAD' || upper === 'OPTIONS') {
+      return { ...DEFAULT_ANNOTATIONS, readonly: true };
     }
     if (upper === 'DELETE') {
       return { ...DEFAULT_ANNOTATIONS, destructive: true };
