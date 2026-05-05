@@ -7,8 +7,16 @@
  * `apcore-toolkit/docs/features/formatting.md`.
  */
 
+import { DEFAULT_ANNOTATIONS } from 'apcore-js';
+
 import type { ScannedModule } from '../types.js';
 import { annotationsToDict, moduleToDict } from '../serializers.js';
+
+// Snake-case dict of every default-valued annotation field. Used by the
+// behavior-table renderer to skip fields that match the protocol default,
+// keeping the table focused on what is actually non-default about the module.
+const DEFAULT_ANNOTATIONS_DICT: Record<string, unknown> =
+  annotationsToDict(DEFAULT_ANNOTATIONS) ?? {};
 
 export type SchemaStyle = 'prose' | 'table' | 'json';
 export type ModuleStyle = 'markdown' | 'skill' | 'table-row' | 'json';
@@ -269,31 +277,67 @@ function renderModuleMarkdownBody(
   return sections.join('\n\n') + '\n';
 }
 
+/**
+ * Render `ModuleAnnotations` as a Markdown fact table.
+ *
+ * Cross-SDK alignment rules (see
+ * `apcore-toolkit/docs/features/formatting.md` § Annotations Rendering):
+ *
+ * 1. Emit only fields whose value differs from `DEFAULT_ANNOTATIONS`.
+ * 2. The `extra` free-form bag is always skipped.
+ * 3. Rows are sorted alphabetically by snake_case key.
+ * 4. Bool values render as lowercase `true` / `false`; objects/arrays use
+ *    `JSON.stringify`; everything else uses `String()`.
+ *
+ * Returns `null` when the resulting table would be empty (i.e. every
+ * annotation field equals its default), causing the caller to omit the
+ * `## Behavior` section entirely.
+ */
 function renderAnnotationsTable(annotations: unknown): string | null {
   const data = annotationsToDict(annotations);
   if (!data) return null;
   const entries: [string, unknown][] = [];
   for (const [key, value] of Object.entries(data)) {
     if (key === 'extra') continue;
-    if (
-      value === null ||
-      value === undefined ||
-      value === false ||
-      value === '' ||
-      (Array.isArray(value) && value.length === 0) ||
-      (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length === 0)
-    ) {
-      continue;
-    }
+    if (deepEqual(value, DEFAULT_ANNOTATIONS_DICT[key])) continue;
     entries.push([key, value]);
   }
   if (entries.length === 0) return null;
+  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const rows = ['| Flag | Value |', '|---|---|'];
   for (const [key, value] of entries) {
-    const rendered = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    let rendered: string;
+    if (value === true) {
+      rendered = 'true';
+    } else if (value === false) {
+      rendered = 'false';
+    } else if (typeof value === 'object' && value !== null) {
+      rendered = JSON.stringify(value);
+    } else {
+      rendered = String(value);
+    }
     rows.push(`| \`${key}\` | ${rendered} |`);
   }
   return rows.join('\n');
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const aKeys = Object.keys(a as Record<string, unknown>).sort();
+  const bKeys = Object.keys(b as Record<string, unknown>).sort();
+  if (aKeys.length !== bKeys.length) return false;
+  if (!aKeys.every((k, i) => k === bKeys[i])) return false;
+  return aKeys.every((k) =>
+    deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
+  );
 }
 
 function yamlScalar(text: string): string {

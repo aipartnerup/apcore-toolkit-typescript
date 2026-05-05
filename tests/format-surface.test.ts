@@ -111,7 +111,41 @@ describe('formatModule markdown', () => {
     expect(out).toContain('| Flag | Value |');
     expect(out).toContain('`readonly`');
     expect(out).toContain('`cacheable`');
+    // destructive=false matches the default; must not appear.
     expect(out).not.toContain('`destructive`');
+  });
+
+  it('annotation bools render as lowercase', () => {
+    const out = formatModule(fixtureModule(), { style: 'markdown' }) as string;
+    expect(out).toContain('| `readonly` | true |');
+    expect(out).toContain('| `cacheable` | true |');
+    expect(out).not.toContain('| `readonly` | True |');
+  });
+
+  it('annotation rows are alphabetically sorted', () => {
+    const out = formatModule(fixtureModule(), { style: 'markdown' }) as string;
+    const readonlyIdx = out.indexOf('`readonly`');
+    const cacheableIdx = out.indexOf('`cacheable`');
+    // 'cacheable' < 'readonly' alphabetically
+    expect(cacheableIdx).toBeLessThan(readonlyIdx);
+  });
+
+  it('skips fields equal to ModuleAnnotations defaults', () => {
+    const out = formatModule(fixtureModule(), { style: 'markdown' }) as string;
+    // pagination_style defaults to "cursor"; must not appear.
+    expect(out).not.toContain('`pagination_style`');
+  });
+
+  it('omits Behavior section when every annotation field equals its default', () => {
+    const module = fixtureModule({ annotations: { ...DEFAULT_ANNOTATIONS } });
+    const out = formatModule(module, { style: 'markdown' }) as string;
+    expect(out).not.toContain('## Behavior');
+  });
+
+  it('omits Behavior section when annotations is null', () => {
+    const module = fixtureModule({ annotations: null });
+    const out = formatModule(module, { style: 'markdown' }) as string;
+    expect(out).not.toContain('## Behavior');
   });
 
   it('emits Examples block when examples present', () => {
