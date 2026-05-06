@@ -32,7 +32,20 @@ export {
   modulesToDicts,
 } from './serializers.js';
 export { resolveTarget } from './resolve-target.js';
-export { toMarkdown } from './formatting/index.js';
+export {
+  toMarkdown,
+  formatSchema,
+  formatModule,
+  formatModules,
+} from './formatting/index.js';
+export type {
+  SchemaStyle,
+  ModuleStyle,
+  GroupBy,
+  FormatSchemaOptions,
+  FormatModuleOptions,
+  FormatModulesOptions,
+} from './formatting/index.js';
 export { AIEnhancer } from './ai-enhancer.js';
 export type { AIEnhancerOptions, Enhancer } from './ai-enhancer.js';
 export { DisplayResolver } from './display/resolver.js';

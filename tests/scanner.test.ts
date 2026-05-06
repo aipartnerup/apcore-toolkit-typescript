@@ -160,6 +160,29 @@ describe('BaseScanner', () => {
         cacheable: true,
       });
     });
+
+    it('HEAD → readonly=true (without cacheable)', () => {
+      const ann = BaseScanner.inferAnnotationsFromMethod('HEAD');
+      expect(ann).toEqual({
+        ...DEFAULT_ANNOTATIONS,
+        readonly: true,
+      });
+      expect(ann.cacheable).toBe(false);
+    });
+
+    it('OPTIONS → readonly=true (without cacheable)', () => {
+      const ann = BaseScanner.inferAnnotationsFromMethod('OPTIONS');
+      expect(ann).toEqual({
+        ...DEFAULT_ANNOTATIONS,
+        readonly: true,
+      });
+      expect(ann.cacheable).toBe(false);
+    });
+
+    it('head (lowercase) → readonly=true (case insensitive)', () => {
+      const ann = BaseScanner.inferAnnotationsFromMethod('head');
+      expect(ann.readonly).toBe(true);
+    });
   });
 
   describe('extractDocstring', () => {
