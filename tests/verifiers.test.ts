@@ -41,6 +41,140 @@ describe('JSONVerifier', () => {
     expect(result.error).not.toMatch(/^JSON parse error/);
     expect(result.error).toMatch(/[Rr]ead error|ENOENT|no such file/);
   });
+
+  // Issue #29 [D9-006]: JSONVerifier schema validation via ajv
+  it('with schema: accepts valid JSON matching schema', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jv-schema-'));
+    const f = path.join(tmpDir, 'valid.json');
+    fs.writeFileSync(f, JSON.stringify({ name: 'alice', age: 30 }));
+    const schema = {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        age: { type: 'number' },
+      },
+      required: ['name'],
+    };
+    const result = new JSONVerifier(schema).verify(f, 'mod');
+    expect(result.ok).toBe(true);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('with schema: rejects JSON that does not match schema', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jv-schema-'));
+    const f = path.join(tmpDir, 'invalid-schema.json');
+    // 'age' should be a number, but here it's a string
+    fs.writeFileSync(f, JSON.stringify({ name: 'alice', age: 'not-a-number' }));
+    const schema = {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        age: { type: 'number' },
+      },
+      required: ['name', 'age'],
+    };
+    const result = new JSONVerifier(schema).verify(f, 'mod');
+    expect(result.ok).toBe(false);
+    expect(result.error).toBeTruthy();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('with schema: rejects JSON missing required field', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jv-schema-'));
+    const f = path.join(tmpDir, 'missing-required.json');
+    fs.writeFileSync(f, JSON.stringify({ age: 30 })); // missing 'name'
+    const schema = {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        age: { type: 'number' },
+      },
+      required: ['name'],
+    };
+    const result = new JSONVerifier(schema).verify(f, 'mod');
+    expect(result.ok).toBe(false);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+});
+
+// Issue #34 [D10-009]: YAMLVerifier should check ALL entries, not just bindings[0]
+describe('YAMLVerifier — all-entries check', () => {
+  it('passes when all entries have module_id and target', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yv-'));
+    const f = path.join(tmpDir, 'ok.binding.yaml');
+    fs.writeFileSync(f, [
+      'bindings:',
+      '  - module_id: a.b',
+      '    target: pkg:a',
+      '  - module_id: c.d',
+      '    target: pkg:c',
+    ].join('\n'));
+    const result = new YAMLVerifier().verify(f, 'mod');
+    expect(result.ok).toBe(true);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('fails when second entry is missing target (first entry is valid)', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yv-'));
+    const f = path.join(tmpDir, 'bad-second.binding.yaml');
+    fs.writeFileSync(f, [
+      'bindings:',
+      '  - module_id: a.b',
+      '    target: pkg:a',
+      '  - module_id: c.d',
+      '    target: ""',  // empty target — should fail
+    ].join('\n'));
+    const result = new YAMLVerifier().verify(f, 'mod');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('target');
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('fails when second entry is missing module_id (first entry is valid)', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yv-'));
+    const f = path.join(tmpDir, 'bad-mid.binding.yaml');
+    fs.writeFileSync(f, [
+      'bindings:',
+      '  - module_id: a.b',
+      '    target: pkg:a',
+      '  - target: pkg:c',  // missing module_id
+    ].join('\n'));
+    const result = new YAMLVerifier().verify(f, 'mod');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('module_id');
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+});
+
+// D11-007: YAMLVerifier must reject whitespace-only module_id/target
+describe('YAMLVerifier — whitespace-only field rejection (D11-007)', () => {
+  it('fails when module_id is whitespace-only', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yv-ws-'));
+    const f = path.join(tmpDir, 'ws-mid.binding.yaml');
+    fs.writeFileSync(f, [
+      'bindings:',
+      '  - module_id: "   "',
+      '    target: pkg:func',
+    ].join('\n'));
+    const result = new YAMLVerifier().verify(f, 'mod');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('module_id');
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('fails when target is whitespace-only', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yv-ws-'));
+    const f = path.join(tmpDir, 'ws-target.binding.yaml');
+    fs.writeFileSync(f, [
+      'bindings:',
+      '  - module_id: a.b',
+      '    target: "  \t  "',
+    ].join('\n'));
+    const result = new YAMLVerifier().verify(f, 'mod');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('target');
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
 });
 
 // W21: _flattenDiagnosticMessage cycle guard (depth limit)

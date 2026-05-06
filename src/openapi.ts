@@ -71,9 +71,10 @@ export function deepResolveRefs(
     }
   }
 
-  // Resolve array items
+  // Resolve array items (single-schema form)
   if (
     "items" in result &&
+    !Array.isArray(result["items"]) &&
     typeof result["items"] === "object" &&
     result["items"] !== null
   ) {
@@ -81,6 +82,15 @@ export function deepResolveRefs(
       result["items"] as Record<string, unknown>,
       openapiDoc,
       depth + 1,
+    );
+  }
+
+  // Resolve tuple-form items (when items is an array of schemas)
+  if (Array.isArray(result["items"])) {
+    result["items"] = (result["items"] as unknown[]).map(item =>
+      typeof item === "object" && item !== null
+        ? deepResolveRefs(item as Record<string, unknown>, openapiDoc, depth + 1)
+        : item,
     );
   }
 
@@ -97,6 +107,47 @@ export function deepResolveRefs(
       resolvedProps[k] = deepResolveRefs(v, openapiDoc, depth + 1);
     }
     result["properties"] = resolvedProps;
+  }
+
+  // additionalProperties when it is a schema (not a boolean)
+  if (result["additionalProperties"] && typeof result["additionalProperties"] === "object") {
+    result["additionalProperties"] = deepResolveRefs(
+      result["additionalProperties"] as Record<string, unknown>,
+      openapiDoc,
+      depth + 1,
+    );
+  }
+
+  // patternProperties — each value is a schema
+  if (result["patternProperties"] && typeof result["patternProperties"] === "object") {
+    result["patternProperties"] = Object.fromEntries(
+      Object.entries(result["patternProperties"] as Record<string, unknown>).map(([k, v]) => [
+        k,
+        typeof v === "object" && v !== null
+          ? deepResolveRefs(v as Record<string, unknown>, openapiDoc, depth + 1)
+          : v,
+      ]),
+    );
+  }
+
+  // not / if / then / else — each is a schema
+  for (const key of ["not", "if", "then", "else"] as const) {
+    if (result[key] && typeof result[key] === "object") {
+      result[key] = deepResolveRefs(
+        result[key] as Record<string, unknown>,
+        openapiDoc,
+        depth + 1,
+      );
+    }
+  }
+
+  // prefixItems — array of schemas
+  if (Array.isArray(result["prefixItems"])) {
+    result["prefixItems"] = (result["prefixItems"] as unknown[]).map(item =>
+      typeof item === "object" && item !== null
+        ? deepResolveRefs(item as Record<string, unknown>, openapiDoc, depth + 1)
+        : item,
+    );
   }
 
   return result;
@@ -137,7 +188,12 @@ export function extractInputSchema(
 
   const requestBody = (operation["requestBody"] ?? {}) as Record<string, unknown>;
   const content = (requestBody["content"] ?? {}) as Record<string, unknown>;
-  const jsonContent = (content["application/json"] ?? {}) as Record<string, unknown>;
+  // Accept both standard application/json and JSON:API vnd content type
+  const jsonContent = (
+    content["application/json"] ??
+    content["application/vnd.api+json"] ??
+    {}
+  ) as Record<string, unknown>;
   const bodySchema = (jsonContent["schema"] ?? {}) as Record<string, unknown>;
 
   if (Object.keys(bodySchema).length > 0) {
@@ -162,6 +218,9 @@ export function extractInputSchema(
     }
   }
 
+  // Deduplicate required[] — path params and body schema may both declare the same field
+  schema.required = [...new Set(schema.required)];
+
   return schema;
 }
 
@@ -178,7 +237,11 @@ export function extractOutputSchema(
   for (const statusCode of successCodes) {
     const response = responses[statusCode] as Record<string, unknown>;
     const content = (response["content"] ?? {}) as Record<string, unknown>;
-    const jsonContent = (content["application/json"] ?? {}) as Record<string, unknown>;
+    const jsonContent = (
+      content["application/json"] ??
+      content["application/vnd.api+json"] ??
+      {}
+    ) as Record<string, unknown>;
 
     if ("schema" in jsonContent) {
       let schema = resolveSchema(

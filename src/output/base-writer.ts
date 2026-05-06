@@ -43,7 +43,10 @@ export function applyVerification(
       return createWriteResult(moduleId, path, false, builtinResult.error ?? null);
     }
   }
-  if (verify && verifiers.length > 0) {
+  // Custom verifiers always run when provided, independent of the built-in verify flag.
+  // This matches Python/Rust behavior where custom verifiers run whenever result.verified
+  // is True (the default), even when verify=False disables built-in verification.
+  if (verifiers.length > 0) {
     const vResult = runVerifierChain(verifiers, path, moduleId);
     if (!vResult.ok) {
       return createWriteResult(moduleId, path, false, vResult.error ?? null);

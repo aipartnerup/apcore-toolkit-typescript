@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
 import { writeFileSync, mkdirSync, realpathSync, lstatSync, renameSync, unlinkSync } from 'node:fs';
-import { resolve, join, sep } from 'node:path';
+import { resolve, join } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import { annotationsToDict } from '../serializers.js';
 import type { WriteResult } from './types.js';

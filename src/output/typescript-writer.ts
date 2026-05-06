@@ -1,5 +1,5 @@
 import { writeFileSync, mkdirSync, realpathSync, lstatSync, renameSync, unlinkSync } from 'node:fs';
-import { resolve, join, sep, isAbsolute } from 'node:path';
+import { resolve, join, isAbsolute } from 'node:path';
 import type { ScannedModule } from '../types.js';
 import type { WriteResult } from './types.js';
 import { createWriteResult } from './types.js';

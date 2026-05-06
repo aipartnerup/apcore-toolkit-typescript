@@ -60,7 +60,7 @@ describe('BaseScanner', () => {
     });
 
     it('filters with include pattern — only matching modules returned', () => {
-      const result = scanner.filterModules(modules, { include: 'users' });
+      const result = scanner.filterModules(modules, 'users');
       expect(result).toHaveLength(2);
       expect(result.map((m) => m.moduleId)).toEqual([
         'users.list',
@@ -69,7 +69,7 @@ describe('BaseScanner', () => {
     });
 
     it('filters with exclude pattern — matching modules removed', () => {
-      const result = scanner.filterModules(modules, { exclude: 'delete' });
+      const result = scanner.filterModules(modules, undefined, 'delete');
       expect(result).toHaveLength(3);
       expect(result.map((m) => m.moduleId)).toEqual([
         'users.list',
@@ -79,16 +79,13 @@ describe('BaseScanner', () => {
     });
 
     it('filters with both include and exclude', () => {
-      const result = scanner.filterModules(modules, {
-        include: 'orders',
-        exclude: 'delete',
-      });
+      const result = scanner.filterModules(modules, 'orders', 'delete');
       expect(result).toHaveLength(1);
       expect(result[0].moduleId).toBe('orders.list');
     });
 
     it('supports regex patterns like Python — ^users matches prefix', () => {
-      const result = scanner.filterModules(modules, { include: '^users' });
+      const result = scanner.filterModules(modules, '^users');
       expect(result).toHaveLength(2);
       expect(result.map((m) => m.moduleId)).toEqual([
         'users.list',
@@ -99,13 +96,28 @@ describe('BaseScanner', () => {
     it('throws SyntaxError for invalid regex patterns', () => {
       const mods = [makeModule('foo.bar'), makeModule('foo(bar)')];
       // "foo(" is invalid regex — now throws instead of silently falling back
-      expect(() => scanner.filterModules(mods, { include: 'foo(' })).toThrow(SyntaxError);
+      expect(() => scanner.filterModules(mods, 'foo(')).toThrow(SyntaxError);
     });
 
     it('dots work as regex wildcards (spec-compatible)', () => {
       const mods = [makeModule('users.list'), makeModule('usersXlist')];
-      const result = scanner.filterModules(mods, { include: 'users.list' });
+      const result = scanner.filterModules(mods, 'users.list');
       expect(result).toHaveLength(2); // dot matches any char in regex
+    });
+
+    // Issue #7 [D1-002] regression: flat params signature
+    it('flat params: filterModules(modules, "^user_", undefined) — include only', () => {
+      const mods = [makeModule('user_profile'), makeModule('user_settings'), makeModule('orders.list')];
+      const result = scanner.filterModules(mods, '^user_', undefined);
+      expect(result).toHaveLength(2);
+      expect(result.map((m) => m.moduleId)).toEqual(['user_profile', 'user_settings']);
+    });
+
+    it('flat params: filterModules(modules, undefined, "test$") — exclude only', () => {
+      const mods = [makeModule('users.list'), makeModule('users.test'), makeModule('orders.test')];
+      const result = scanner.filterModules(mods, undefined, 'test$');
+      expect(result).toHaveLength(1);
+      expect(result[0].moduleId).toBe('users.list');
     });
   });
 

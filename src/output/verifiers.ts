@@ -1,6 +1,7 @@
 import { readFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import yaml from 'js-yaml';
+import Ajv from 'ajv';
 import type { Verifier, VerifyResult } from './types.js';
 
 // Re-export runtime-neutral verifier primitives so downstream imports from
@@ -37,7 +38,7 @@ export class YAMLVerifier implements Verifier {
       for (let i = 0; i < bindings.length; i++) {
         const entry = bindings[i] as Record<string, unknown>;
         for (const field of ['module_id', 'target'] as const) {
-          if (typeof entry[field] !== 'string' || entry[field] === '') {
+          if (typeof entry[field] !== 'string' || (entry[field] as string).trim() === '') {
             return { ok: false, error: `Missing or empty required field '${field}' in binding[${i}]` };
           }
         }
@@ -125,13 +126,13 @@ export class MagicBytesVerifier implements Verifier {
 }
 
 export class JSONVerifier implements Verifier {
+  private readonly _ajv: Ajv.Ajv | null = null;
+  private readonly _schema: Record<string, unknown> | null = null;
+
   constructor(schema?: Record<string, unknown>) {
     if (schema != null) {
-      throw new Error(
-        'JSONVerifier: schema validation is not yet implemented. ' +
-          'Install ajv and update JSONVerifier.verify() to enable schema validation, ' +
-          'or construct JSONVerifier without a schema argument for syntax-only checking.',
-      );
+      this._ajv = new Ajv();
+      this._schema = schema;
     }
   }
 
@@ -142,12 +143,19 @@ export class JSONVerifier implements Verifier {
     } catch (err) {
       return { ok: false, error: `Read error: ${(err as Error).message}`, cause: err };
     }
+    let data: unknown;
     try {
-      JSON.parse(content);
-      return { ok: true };
+      data = JSON.parse(content);
     } catch (err) {
       return { ok: false, error: `JSON parse error: ${(err as Error).message}`, cause: err };
     }
+    if (this._ajv && this._schema) {
+      const valid = this._ajv.validate(this._schema, data);
+      if (!valid) {
+        return { ok: false, error: this._ajv.errorsText() };
+      }
+    }
+    return { ok: true };
   }
 }
 

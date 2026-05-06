@@ -70,23 +70,25 @@ export abstract class BaseScanner {
    * Apply include/exclude regex filters to a list of scanned modules.
    *
    * @param modules - Modules to filter.
-   * @param options - Optional `include` and/or `exclude` regex pattern strings.
+   * @param include - Optional regex pattern string; only matching module IDs are kept.
+   * @param exclude - Optional regex pattern string; matching module IDs are removed.
    * @returns Filtered array of modules.
    * @throws {SyntaxError} When `include` or `exclude` contain an invalid regex pattern.
    */
   filterModules(
     modules: ScannedModule[],
-    options?: { include?: string; exclude?: string },
+    include?: string,
+    exclude?: string,
   ): ScannedModule[] {
     let result = modules;
 
-    if (options?.include != null) {
-      const re = new RegExp(options.include);
+    if (include != null) {
+      const re = new RegExp(include);
       result = result.filter((m) => re.test(m.moduleId));
     }
 
-    if (options?.exclude != null) {
-      const re = new RegExp(options.exclude);
+    if (exclude != null) {
+      const re = new RegExp(exclude);
       result = result.filter((m) => !re.test(m.moduleId));
     }
 

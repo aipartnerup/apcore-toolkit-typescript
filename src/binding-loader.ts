@@ -32,6 +32,12 @@ import type { ScannedModule } from './types.js';
 export { BindingLoadError, BindingParser, parseBindingDocument } from './binding-parser.js';
 export type { BindingLoadOptions } from './binding-parser.js';
 
+/** Maximum file size (bytes) that BindingLoader will read — matches Rust SDK's 16 MiB cap. */
+const MAX_BINDING_FILE_SIZE = 16 * 1024 * 1024; // 16 MiB
+
+/** Maximum number of .binding.yaml files per directory scan — matches Rust SDK's cap. */
+const MAX_BINDING_FILES_PER_DIR = 10_000;
+
 // Cap on directory recursion depth in `_collectRecursive`. This is the
 // PRIMARY defense against symlink loops (`a -> b -> a`): `statSync` resolves
 // symlinks but does not detect cycles, so a cyclic graph would recurse until
@@ -52,19 +58,22 @@ const MAX_RECURSION_DEPTH = 64;
  * ```ts
  * const loader = new BindingLoader();
  * const modules = loader.load('./bindings/');
- * const strict = loader.load('foo.binding.yaml', { strict: true });
+ * const strict = loader.load('foo.binding.yaml', true, false);
  * ```
  */
 export class BindingLoader extends BindingParser {
   /**
    * Load one file or every `*.binding.yaml` in a directory.
    *
+   * @param filePath - Path to a single `.binding.yaml` file or a directory.
+   * @param strict - When `true`, also require `input_schema` and `output_schema`. Default: `false`.
+   * @param recursive - When `true`, recurse into subdirectories. Default: `false`.
    * @throws {BindingLoadError} when the path is missing, YAML is malformed,
    *   or any entry fails validation.
    */
-  load(filePath: string, options?: BindingLoadOptions): ScannedModule[] {
-    const strict = options?.strict ?? false;
-    const recursive = options?.recursive ?? false;
+  load(filePath: string, strict?: boolean, recursive?: boolean): ScannedModule[] {
+    strict = strict ?? false;
+    recursive = recursive ?? false;
 
     let stat: fs.Stats;
     try {
@@ -85,9 +94,16 @@ export class BindingLoader extends BindingParser {
       if (recursive) {
         files = this._collectRecursive(filePath).sort();
       } else {
-        files = fs
+        const allEntries = fs
           .readdirSync(filePath)
-          .filter((f) => f.endsWith('.binding.yaml'))
+          .filter((f) => f.endsWith('.binding.yaml'));
+        if (allEntries.length > MAX_BINDING_FILES_PER_DIR) {
+          throw new BindingLoadError({
+            reason: `too many files in directory: ${allEntries.length} exceeds limit of ${MAX_BINDING_FILES_PER_DIR}`,
+            filePath,
+          });
+        }
+        files = allEntries
           .sort()
           .map((f) => path.join(filePath, f));
       }
@@ -100,6 +116,22 @@ export class BindingLoader extends BindingParser {
 
     const modules: ScannedModule[] = [];
     for (const f of files) {
+      // Enforce per-file size cap before reading
+      let fileStat: fs.Stats;
+      try {
+        fileStat = fs.statSync(f);
+      } catch (exc) {
+        throw new BindingLoadError({
+          reason: `failed to stat file: ${(exc as Error).message}`,
+          filePath: f,
+        });
+      }
+      if (fileStat.size > MAX_BINDING_FILE_SIZE) {
+        throw new BindingLoadError({
+          reason: `file too large: ${fileStat.size} bytes exceeds limit of ${MAX_BINDING_FILE_SIZE} bytes (16 MiB)`,
+          filePath: f,
+        });
+      }
       let content: string;
       try {
         content = fs.readFileSync(f, 'utf-8');

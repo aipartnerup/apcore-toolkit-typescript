@@ -11,7 +11,7 @@ import { InvalidFormatError } from './errors.js';
  * Return the writer for the given output format.
  *
  * @param format - One of `"yaml"`, `"typescript"`, `"registry"`, or
- *   `"http-proxy"` / `"http_proxy"`.
+ *   `"http-proxy"` / `"http_proxy"` / `"httpproxy"`.
  * @param options - Required for `"http-proxy"`: must be
  *   {@link HTTPProxyRegistryWriterOptions}. Ignored for the other formats.
  * @returns The corresponding writer instance.
@@ -25,7 +25,7 @@ export function getWriter(
   if (format === 'yaml') return new YAMLWriter();
   if (format === 'typescript') return new TypeScriptWriter();
   if (format === 'registry') return new RegistryWriter();
-  if (format === 'http-proxy' || format === 'http_proxy') {
+  if (format === 'http-proxy' || format === 'http_proxy' || format === 'httpproxy') {
     if (!options || typeof options.baseUrl !== 'string') {
       throw new TypeError(
         "getWriter('http-proxy', options) requires options.baseUrl",

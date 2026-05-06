@@ -26,12 +26,14 @@ describe('applyVerification', () => {
     expect(out.verificationError).toBe('failed');
   });
 
-  it('skips custom verifier chain when verify=false (verify flag gates all verification)', () => {
+  // D11-011: custom verifiers run independently of the built-in verify flag
+  // (matches Python/Rust behavior where custom verifiers always run if provided)
+  it('runs custom verifier chain even when verify=false (D11-011)', () => {
     const result = createWriteResult('mod', '/tmp/f');
     const out = applyVerification(result, passVerifier, [failVerifier], '/tmp/f', 'mod', false);
-    // verify=false means NO verification — custom verifiers must not run
-    expect(out.verified).toBe(true);
-    expect(out.verificationError).toBeNull();
+    // verify=false skips built-in verification, but custom verifiers still run
+    expect(out.verified).toBe(false);
+    expect(out.verificationError).toBe('failed');
   });
 
   it('runs custom verifier chain when verify=true and builtin passes', () => {

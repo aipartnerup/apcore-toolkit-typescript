@@ -295,6 +295,54 @@ describe("extractInputSchema", () => {
       properties: { street: { type: "string" } },
     });
   });
+
+  // Issue #32 [D10-partial]: extractInputSchema should accept application/vnd.api+json
+  it("accepts application/vnd.api+json as requestBody content type", () => {
+    const operation = {
+      requestBody: {
+        content: {
+          "application/vnd.api+json": {
+            schema: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                email: { type: "string" },
+              },
+              required: ["name"],
+            },
+          },
+        },
+      },
+    };
+    const result = extractInputSchema(operation);
+    expect((result.properties as Record<string, unknown>)).toHaveProperty("name");
+    expect((result.properties as Record<string, unknown>)).toHaveProperty("email");
+    expect(result.required).toContain("name");
+  });
+
+  it("prefers application/json over application/vnd.api+json when both are present", () => {
+    const operation = {
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: { fromJson: { type: "string" } },
+            },
+          },
+          "application/vnd.api+json": {
+            schema: {
+              type: "object",
+              properties: { fromVnd: { type: "string" } },
+            },
+          },
+        },
+      },
+    };
+    const result = extractInputSchema(operation);
+    expect((result.properties as Record<string, unknown>)).toHaveProperty("fromJson");
+    expect((result.properties as Record<string, unknown>)).not.toHaveProperty("fromVnd");
+  });
 });
 
 describe("extractOutputSchema", () => {
@@ -497,6 +545,177 @@ describe("extractOutputSchema — 2xx range", () => {
     const props = (result as Record<string, Record<string, unknown>>).properties;
     expect(props).toBeDefined();
     expect(Object.prototype.hasOwnProperty.call(props, "ok")).toBe(true);
+  });
+});
+
+// D11-003: deepResolveRefs must resolve additional JSON Schema keywords
+describe("deepResolveRefs — additional JSON Schema keywords", () => {
+  const doc = {
+    $defs: {
+      Tag: { type: "object", properties: { name: { type: "string" } } },
+      Foo: { type: "object", properties: { foo: { type: "boolean" } } },
+      A:   { type: "string" },
+      B:   { type: "integer" },
+    },
+  };
+
+  it("resolves additionalProperties when it is a schema object", () => {
+    const schema = { type: "object", additionalProperties: { $ref: "#/$defs/Tag" } };
+    const result = deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    expect(result.additionalProperties).toMatchObject({ type: "object", properties: { name: { type: "string" } } });
+  });
+
+  it("does not resolve additionalProperties when it is a boolean", () => {
+    const schema = { type: "object", additionalProperties: false };
+    const result = deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    expect(result.additionalProperties).toBe(false);
+  });
+
+  it("resolves patternProperties values", () => {
+    const schema = { type: "object", patternProperties: { "^tag_": { $ref: "#/$defs/Tag" } } };
+    const result = deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    const pp = result.patternProperties as Record<string, unknown>;
+    expect(pp["^tag_"]).toMatchObject({ type: "object", properties: { name: { type: "string" } } });
+  });
+
+  it("resolves not keyword", () => {
+    const schema = { not: { $ref: "#/$defs/Foo" } };
+    const result = deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    expect(result.not).toMatchObject({ type: "object", properties: { foo: { type: "boolean" } } });
+  });
+
+  it("resolves if/then/else keywords", () => {
+    const schema = {
+      if:   { $ref: "#/$defs/Foo" },
+      then: { $ref: "#/$defs/Tag" },
+      else: { $ref: "#/$defs/A"   },
+    };
+    const result = deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    expect(result.if).toMatchObject({ type: "object" });
+    expect(result.then).toMatchObject({ type: "object", properties: { name: { type: "string" } } });
+    expect(result.else).toMatchObject({ type: "string" });
+  });
+
+  it("resolves prefixItems array", () => {
+    const schema = { type: "array", prefixItems: [{ $ref: "#/$defs/A" }, { $ref: "#/$defs/B" }] };
+    const result = deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    const pi = result.prefixItems as Record<string, unknown>[];
+    expect(pi[0]).toMatchObject({ type: "string" });
+    expect(pi[1]).toMatchObject({ type: "integer" });
+  });
+
+  it("resolves tuple-form items (array of schemas)", () => {
+    const schema = { type: "array", items: [{ $ref: "#/$defs/A" }, { $ref: "#/$defs/B" }] };
+    const result = deepResolveRefs(schema as Record<string, unknown>, doc as Record<string, unknown>);
+    const items = result.items as Record<string, unknown>[];
+    expect(items[0]).toMatchObject({ type: "string" });
+    expect(items[1]).toMatchObject({ type: "integer" });
+  });
+});
+
+// D11-004: extractInputSchema required[] must be deduplicated
+describe("extractInputSchema — required deduplication", () => {
+  it("deduplicates required when path param and body schema both declare same field required", () => {
+    const operation = {
+      parameters: [
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
+      ],
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              properties: { id: { type: "string" }, name: { type: "string" } },
+              required: ["id", "name"],
+            },
+          },
+        },
+      },
+    };
+    const result = extractInputSchema(operation as Record<string, unknown>);
+    expect(result.required).toEqual(["id", "name"]);
+    // Specifically confirm no duplicates
+    const required = result.required as string[];
+    expect(required.filter(v => v === "id").length).toBe(1);
+  });
+});
+
+// D11-002: extractOutputSchema must fall back to application/vnd.api+json
+describe("extractOutputSchema — vnd.api+json fallback", () => {
+  it("returns schema when response uses application/vnd.api+json content type", () => {
+    const operation = {
+      responses: {
+        "200": {
+          content: {
+            "application/vnd.api+json": {
+              schema: {
+                type: "object",
+                properties: { data: { type: "string" } },
+              },
+            },
+          },
+        },
+      },
+    };
+    const result = extractOutputSchema(operation as Record<string, unknown>);
+    const props = result.properties as Record<string, unknown>;
+    expect(props).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(props, "data")).toBe(true);
+  });
+
+  it("prefers application/json over application/vnd.api+json in responses", () => {
+    const operation = {
+      responses: {
+        "200": {
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { fromJson: { type: "string" } } },
+            },
+            "application/vnd.api+json": {
+              schema: { type: "object", properties: { fromVnd: { type: "string" } } },
+            },
+          },
+        },
+      },
+    };
+    const result = extractOutputSchema(operation as Record<string, unknown>);
+    const props = result.properties as Record<string, unknown>;
+    expect(props).toHaveProperty("fromJson");
+    expect(props).not.toHaveProperty("fromVnd");
+  });
+});
+
+// D11-001: extractOutputSchema must cover 206 and 207 codes
+describe("extractOutputSchema — 2xx range coverage (D11-001)", () => {
+  it("returns schema from 206 response", () => {
+    const op = {
+      responses: {
+        "206": {
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { partial: { type: "boolean" } } },
+            },
+          },
+        },
+      },
+    };
+    const result = extractOutputSchema(op as Record<string, unknown>);
+    expect((result.properties as Record<string, unknown>)).toHaveProperty("partial");
+  });
+
+  it("returns schema from 207 response", () => {
+    const op = {
+      responses: {
+        "207": {
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { multi: { type: "boolean" } } },
+            },
+          },
+        },
+      },
+    };
+    const result = extractOutputSchema(op as Record<string, unknown>);
+    expect((result.properties as Record<string, unknown>)).toHaveProperty("multi");
   });
 });
 

@@ -216,8 +216,10 @@ describe('JSONVerifier', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('throws at construction when schema is provided (schema validation not yet implemented)', () => {
-    expect(() => new JSONVerifier({ type: 'object' })).toThrow('not yet implemented');
+  it('accepts schema at construction (schema validation now implemented via ajv)', () => {
+    // Issue #29 [D9-006]: JSONVerifier now implements schema validation;
+    // constructing with a schema must NOT throw.
+    expect(() => new JSONVerifier({ type: 'object' })).not.toThrow();
   });
 });
 
