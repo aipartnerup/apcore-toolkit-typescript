@@ -38,6 +38,28 @@ import { createWriteResult } from './types.js';
 /** HTTP methods that conventionally carry a JSON request body. */
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
+/** Matches any unfilled placeholder ({name} or :name) left after substitution. */
+const UNFILLED_PARAM_RE = /\{[^}]+\}|:[a-zA-Z_]\w*/;
+
+/**
+ * Percent-encode a path-parameter value per RFC 3986 unreserved set.
+ *
+ * Mirrors Rust's `percent_encode_path_segment` and Python's
+ * `_percent_encode_path_segment` so a path-param value containing `/`,
+ * `?`, `#`, `%`, or whitespace cannot break the request URL. The
+ * unreserved set is `ALPHA / DIGIT / "-" / "." / "_" / "~"`.
+ *
+ * `encodeURIComponent` already encodes everything outside that set
+ * EXCEPT `! ' ( ) *`; we encode those four explicitly so the output
+ * matches the Python `urllib.parse.quote(safe="")` baseline.
+ */
+function percentEncodePathSegment(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
 /**
  * Shape of a registry that `HTTPProxyRegistryWriter` writes to.
  *
@@ -196,14 +218,30 @@ export class HTTPProxyRegistryWriter {
         }
       }
 
-      // Split inputs into path-params and remaining; substitute path placeholders.
+      // Split inputs into path-params and remaining; percent-encode every
+      // path-param value (RFC 3986 unreserved set) BEFORE substitution so
+      // values containing "/", "?", "#", "%", or whitespace cannot
+      // corrupt the URL. Mirrors the Rust implementation.
       const pathValues: Record<string, unknown> = {};
       const nonPath: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(inputs)) {
-        if (pathParams.has(k)) pathValues[k] = v;
-        else nonPath[k] = v;
+        if (pathParams.has(k)) {
+          pathValues[k] = v == null ? '' : percentEncodePathSegment(String(v));
+        } else {
+          nonPath[k] = v;
+        }
       }
       const actualPath = substitutePathParams(urlPath, pathValues);
+      // Reject the request if any placeholder went unfilled — otherwise a
+      // forgotten input would silently leak `{name}` into the request URL.
+      const unfilled = UNFILLED_PARAM_RE.exec(actualPath);
+      if (unfilled !== null) {
+        throw new ModuleError(
+          ErrorCodes.MODULE_EXECUTE_ERROR,
+          `path parameter not provided: ${JSON.stringify(unfilled[0])} in url_path ${JSON.stringify(urlPath)}`,
+          { url_path: urlPath, missing: unfilled[0] },
+        );
+      }
       let fullUrl = joinUrl(baseUrl, actualPath);
 
       let body: string | undefined;

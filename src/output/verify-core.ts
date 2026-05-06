@@ -39,7 +39,9 @@ export class RegistryVerifier implements Verifier {
 /**
  * Run a chain of verifiers in order, returning the first failure.
  * If a verifier throws an exception, it is caught and returned as a failure
- * with the prefix "Verifier crashed:".
+ * with the spec-mandated prefix "Verifier crashed:" — matches the literal
+ * emitted by the Python and Rust SDKs so callers writing
+ * `error.startsWith("Verifier crashed")` succeed cross-language.
  *
  * @param verifiers - Ordered list of verifiers to run.
  * @param path - File path to verify.
@@ -58,7 +60,15 @@ export function runVerifierChain(
     } catch (e) {
       const name = verifier.constructor?.name ?? 'UnknownVerifier';
       const msg = e instanceof Error ? e.message : String(e);
-      return { ok: false, error: `${name} crashed: ${msg}`, cause: e };
+      // Spec mandates the literal prefix "Verifier crashed:" so callers
+      // can use error.startsWith("Verifier crashed") cross-language. The
+      // verifier's class name is appended in parentheses so the W23
+      // regression (verifier identity) keeps its diagnostic value.
+      return {
+        ok: false,
+        error: `Verifier crashed: ${msg} (verifier: ${name})`,
+        cause: e,
+      };
     }
   }
   return { ok: true };

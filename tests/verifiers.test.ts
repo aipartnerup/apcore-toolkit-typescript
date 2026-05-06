@@ -248,6 +248,19 @@ describe('runVerifierChain', () => {
     expect(result.error).toContain('boom');
   });
 
+  // D10-001 regression: error string MUST start with the spec-mandated literal
+  // "Verifier crashed:" so cross-language callers can do
+  // `result.error.startsWith("Verifier crashed")` against the Python and Rust
+  // SDKs as well.
+  it('uses the spec-mandated "Verifier crashed:" literal prefix', () => {
+    class ExplodingVerifier implements Verifier {
+      verify(): VerifyResult { throw new Error('boom'); }
+    }
+    const result = runVerifierChain([new ExplodingVerifier()], '/path', 'mod');
+    expect(result.ok).toBe(false);
+    expect(result.error?.startsWith('Verifier crashed:')).toBe(true);
+  });
+
   // W24 regression: VerifyResult.cause should be set on crashes
   it('sets cause on crashed verifier result', () => {
     const err = new Error('root cause');

@@ -130,6 +130,51 @@ describe('HTTPProxyRegistryWriter', () => {
     expect(calls[0].body).toBe(JSON.stringify({ title: 'b' }));
   });
 
+  // D11-3b regression: path-param values must be RFC 3986 percent-encoded
+  // BEFORE substitution so reserved chars cannot corrupt the URL.
+  it('percent-encodes path-param values', async () => {
+    const { fetchImpl, calls } = recordingFetch(() => jsonResponse(200, { ok: true }));
+    const writer = new HTTPProxyRegistryWriter({
+      baseUrl: 'http://localhost:8000',
+      fetchImpl,
+    });
+    await writer.write(
+      [
+        mkModule({
+          moduleId: 'tasks.fetch',
+          metadata: { httpMethod: 'GET', urlPath: '/items/{item_id}' },
+        }),
+      ],
+      registry,
+    );
+    const mod = getRegistered(registry, 'tasks.fetch');
+    await mod.execute({ item_id: 'a/b#c' }, {} as Context);
+    // ``/`` -> ``%2F``, ``#`` -> ``%23``
+    expect(calls[0].url).toBe('http://localhost:8000/items/a%2Fb%23c');
+  });
+
+  // D11-3b regression: a missing path-parameter input must NOT leak ``{name}``
+  // into the request URL — it must throw ``ModuleError`` and skip fetch.
+  it('throws ModuleError when a path placeholder is unfilled', async () => {
+    const { fetchImpl, calls } = recordingFetch(() => jsonResponse(200, {}));
+    const writer = new HTTPProxyRegistryWriter({
+      baseUrl: 'http://localhost:8000',
+      fetchImpl,
+    });
+    await writer.write(
+      [
+        mkModule({
+          moduleId: 'tasks.miss',
+          metadata: { httpMethod: 'GET', urlPath: '/items/{item_id}' },
+        }),
+      ],
+      registry,
+    );
+    const mod = getRegistered(registry, 'tasks.miss');
+    await expect(mod.execute({}, {} as Context)).rejects.toThrow(/item_id/);
+    expect(calls).toHaveLength(0);
+  });
+
   it('puts non-path inputs into the query string for GET', async () => {
     const { fetchImpl, calls } = recordingFetch(() => jsonResponse(200, { list: [] }));
     const writer = new HTTPProxyRegistryWriter({
