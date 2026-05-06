@@ -2,6 +2,7 @@ import { readFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import yaml from 'js-yaml';
 import Ajv from 'ajv';
+import type { default as AjvType } from 'ajv';
 import type { Verifier, VerifyResult } from './types.js';
 
 // Re-export runtime-neutral verifier primitives so downstream imports from
@@ -126,12 +127,15 @@ export class MagicBytesVerifier implements Verifier {
 }
 
 export class JSONVerifier implements Verifier {
-  private readonly _ajv: Ajv.Ajv | null = null;
+  private readonly _ajv: AjvType | null = null;
   private readonly _schema: Record<string, unknown> | null = null;
 
   constructor(schema?: Record<string, unknown>) {
     if (schema != null) {
-      this._ajv = new Ajv();
+      // `strict: false` keeps v6-compatible permissive behaviour for
+      // schemas that may include vendor extensions or unknown keywords;
+      // tightening the schema is the schema author's responsibility.
+      this._ajv = new Ajv({ strict: false });
       this._schema = schema;
     }
   }

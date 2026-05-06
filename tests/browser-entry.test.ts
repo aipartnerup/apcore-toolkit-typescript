@@ -148,7 +148,7 @@ describe('browser entry point', () => {
       'runVerifierChain',
       // HTTP proxy writer
       'HTTPProxyRegistryWriter',
-      'HTTPProxyWriterError',
+      'HTTPProxyRegistryWriterError',
     ];
     for (const name of expected) {
       expect(browser, `expected "${name}" to be exported`).toHaveProperty(name);

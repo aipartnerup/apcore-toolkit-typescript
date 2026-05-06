@@ -4,7 +4,7 @@ import type { Context } from 'apcore-js';
 
 import {
   HTTPProxyRegistryWriter,
-  HTTPProxyWriterError,
+  HTTPProxyRegistryWriterError,
 } from '../src/output/http-proxy-writer.js';
 import type { ScannedModule } from '../src/types.js';
 import { createScannedModule } from '../src/types.js';
@@ -240,16 +240,16 @@ describe('HTTPProxyRegistryWriter', () => {
       registry,
     );
     expect(results[0].verified).toBe(false);
-    expect(results[0].verificationError ?? '').toContain('HTTPProxyWriterError');
+    expect(results[0].verificationError ?? '').toContain('HTTPProxyRegistryWriterError');
   });
 
-  it('exposes HTTPProxyWriterError as a named class', () => {
-    expect(new HTTPProxyWriterError('m', 'x').name).toBe('HTTPProxyWriterError');
+  it('exposes HTTPProxyRegistryWriterError as a named class', () => {
+    expect(new HTTPProxyRegistryWriterError('m', 'x').name).toBe('HTTPProxyRegistryWriterError');
   });
 
   it('can be imported from the package entry', async () => {
     const pkg = await import('../src/index.js');
     expect(typeof pkg.HTTPProxyRegistryWriter).toBe('function');
-    expect(typeof pkg.HTTPProxyWriterError).toBe('function');
+    expect(typeof pkg.HTTPProxyRegistryWriterError).toBe('function');
   });
 });

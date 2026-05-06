@@ -137,20 +137,27 @@ describe('RegistryWriter', () => {
     });
   });
 
-  // registry.register() throws regression (D3-register)
+  // registry.register() failure handling — D11-8 audit-fix:
+  // RegistryWriter.write canonicalised on always-collect (matches Python and
+  // Rust + spec D10-006 "one bad module does not abort the batch"). Per-module
+  // failures are captured into a failed WriteResult, never thrown.
   describe('registry.register() error handling', () => {
-    it('throws WriteError when registry.register() throws', async () => {
+    it('captures registry.register failures into a failed WriteResult', async () => {
       const writer = new RegistryWriter();
-      const mod = createScannedModule({ ...REQUIRED_FIELDS });
+      const modA = createScannedModule({ ...REQUIRED_FIELDS, moduleId: 'mod.a' });
+      const modB = createScannedModule({ ...REQUIRED_FIELDS, moduleId: 'mod.b' });
       const registry = {
-        register(_id: string, _module: unknown) {
-          throw new Error('duplicate module id');
+        register(id: string, _module: unknown) {
+          if (id === 'mod.a') throw new Error('duplicate module id');
         },
       };
 
-      const { WriteError } = await import('../src/output/errors.js');
-      await expect(writer.write([mod], registry)).rejects.toThrow(WriteError);
-      await expect(writer.write([mod], registry)).rejects.toThrow('duplicate module id');
+      const results = await writer.write([modA, modB], registry);
+      expect(results).toHaveLength(2);
+      expect(results[0].verified).toBe(false);
+      expect(results[0].verificationError).toContain('duplicate module id');
+      // The failing module does NOT abort the batch — modB still succeeds.
+      expect(results[1].verified).toBe(true);
     });
   });
 });

@@ -93,10 +93,10 @@ export interface HTTPProxyRegistryWriterOptions {
  * Error thrown when HTTP fields (method / path) cannot be extracted from
  * a ScannedModule.
  */
-export class HTTPProxyWriterError extends Error {
+export class HTTPProxyRegistryWriterError extends Error {
   constructor(moduleId: string, message: string) {
     super(`[${moduleId}] ${message}`);
-    this.name = 'HTTPProxyWriterError';
+    this.name = 'HTTPProxyRegistryWriterError';
   }
 }
 
@@ -113,7 +113,7 @@ function getHttpFields(mod: ScannedModule): HttpFields {
   let urlPath = (typeof p === 'string' && p) || (typeof metadata.urlPath === 'string' && metadata.urlPath) || '/';
   urlPath = String(urlPath);
   if (/^(https?|file|ftp):\/\//i.test(urlPath)) {
-    throw new HTTPProxyWriterError(
+    throw new HTTPProxyRegistryWriterError(
       mod.moduleId,
       `url_path must be a relative path, not an absolute URL: ${JSON.stringify(urlPath)}`,
     );
@@ -178,8 +178,15 @@ export class HTTPProxyRegistryWriter {
    * Returns one {@link WriteResult} per module. A module that fails to
    * build is reported with `verified: false` rather than throwing, so
    * one bad module does not abort the batch.
+   *
+   * The method is synchronous — `write` performs no I/O, only registry
+   * mutation. This matches the spec property `async: false` and the
+   * Python and Rust SDKs. (HTTP requests happen later, at module call
+   * time.) The previous `async` modifier was return-type sugar with no
+   * internal `await`; existing callers using `await writer.write(...)`
+   * keep working because `await` on a non-promise resolves immediately.
    */
-  async write(modules: ScannedModule[], registry: ProxyRegistry): Promise<WriteResult[]> {
+  write(modules: ScannedModule[], registry: ProxyRegistry): WriteResult[] {
     const results: WriteResult[] = [];
     for (const mod of modules) {
       try {

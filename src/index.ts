@@ -61,7 +61,7 @@ export { TypeScriptWriter } from './output/typescript-writer.js';
 export { RegistryWriter } from './output/registry-writer.js';
 export {
   HTTPProxyRegistryWriter,
-  HTTPProxyWriterError,
+  HTTPProxyRegistryWriterError,
 } from './output/http-proxy-writer.js';
 export type {
   HTTPProxyRegistryWriterOptions,
@@ -84,45 +84,22 @@ const _require = createRequire(import.meta.url);
 const _pkg = _require('../package.json') as { version: string };
 export const VERSION: string = _pkg.version;
 
-// Issue #6 [D1-001]: Package-level free-function exports for cross-language parity.
-// Python and Rust expose these as package-level symbols; TypeScript previously
-// only exposed them as BaseScanner instance/static methods.
+// Package-level free-function exports for cross-language parity.
+// Python and Rust expose these as top-level symbols; TypeScript re-exports
+// them directly from `scanner.ts` (where they are now the canonical
+// implementation; the corresponding `BaseScanner` instance methods
+// delegate to them). This eliminates the dummy abstract-subclass shim
+// that earlier versions used.
+export { filterModules, deduplicateIds } from './scanner.js';
+
 import { BaseScanner as _BaseScanner } from './scanner.js';
 import type { ModuleAnnotations } from 'apcore-js';
 
 /**
- * Apply include/exclude regex filters to a list of scanned modules.
- * Package-level free function; delegates to BaseScanner.filterModules.
- */
-export function filterModules(
-  modules: import('./types.js').ScannedModule[],
-  include?: string,
-  exclude?: string,
-): import('./types.js').ScannedModule[] {
-  return _scanner.filterModules(modules, include, exclude);
-}
-
-/**
- * Deduplicate module IDs by appending a numeric suffix to colliding entries.
- * Package-level free function; delegates to BaseScanner.deduplicateIds.
- */
-export function deduplicateIds(
-  modules: import('./types.js').ScannedModule[],
-): import('./types.js').ScannedModule[] {
-  return _scanner.deduplicateIds(modules);
-}
-
-/**
  * Infer behavioral annotations from an HTTP method string.
- * Package-level free function; delegates to BaseScanner.inferAnnotationsFromMethod.
+ * Package-level free function; thin wrapper over the static
+ * {@link BaseScanner.inferAnnotationsFromMethod}.
  */
 export function inferAnnotationsFromMethod(method: string): ModuleAnnotations {
   return _BaseScanner.inferAnnotationsFromMethod(method);
 }
-
-// Shared scanner instance used only for the free-function wrappers above.
-// We need a concrete subclass because BaseScanner is abstract.
-const _scanner = new (class extends _BaseScanner {
-  scan(): import('./types.js').ScannedModule[] { return []; }
-  getSourceName(): string { return '__free_fn_scanner__'; }
-})();

@@ -82,7 +82,7 @@ export { RegistryVerifier, runVerifierChain } from '../output/verify-core.js';
 // Deno, workers).
 export {
   HTTPProxyRegistryWriter,
-  HTTPProxyWriterError,
+  HTTPProxyRegistryWriterError,
 } from '../output/http-proxy-writer.js';
 export type {
   HTTPProxyRegistryWriterOptions,

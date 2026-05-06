@@ -37,7 +37,6 @@ export class RegistryWriter {
     const shouldVerify = options?.verify ?? false;
     const verifiers = options?.verifiers ?? [];
     const allowedPrefixes = options?.allowedPrefixes;
-    const errorMode = options?.errorMode ?? 'throw';
     const results: WriteResult[] = [];
 
     for (const mod of modules) {
@@ -45,24 +44,36 @@ export class RegistryWriter {
         results.push(createWriteResult(mod.moduleId, null));
         continue;
       }
+      // Per-module failures (target resolution, registry.register) are
+      // captured into a failed WriteResult rather than thrown so one bad
+      // module does not abort the batch. Mirrors Python and Rust and
+      // matches the spec contract for HTTPProxyRegistryWriter.write.
       let fm: FunctionModule;
       try {
         fm = await this._toFunctionModule(mod, allowedPrefixes);
       } catch (err) {
-        if (errorMode === 'collect') {
-          results.push(createWriteResult(mod.moduleId, null, false, err instanceof Error ? err.message : String(err)));
-          continue;
-        }
-        throw new WriteError(mod.moduleId, err);
+        results.push(
+          createWriteResult(
+            mod.moduleId,
+            null,
+            false,
+            err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+          ),
+        );
+        continue;
       }
       try {
         registry.register(mod.moduleId, fm);
       } catch (err) {
-        if (errorMode === 'collect') {
-          results.push(createWriteResult(mod.moduleId, null, false, err instanceof Error ? err.message : String(err)));
-          continue;
-        }
-        throw new WriteError(mod.moduleId, err);
+        results.push(
+          createWriteResult(
+            mod.moduleId,
+            null,
+            false,
+            err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+          ),
+        );
+        continue;
       }
 
       const result = applyVerification(

@@ -3,6 +3,86 @@ import { DEFAULT_ANNOTATIONS } from 'apcore-js';
 import type { ScannedModule } from './types.js';
 import { cloneModule } from './types.js';
 
+/**
+ * Apply include/exclude regex filters to a list of scanned modules.
+ *
+ * Module-level free function — the canonical implementation. The
+ * {@link BaseScanner.filterModules} instance method delegates here so
+ * the package can re-export this directly from `apcore-toolkit/index`
+ * for cross-language symbol parity (Python: `apcore_toolkit.filter_modules`,
+ * Rust: `apcore_toolkit::filter_modules`).
+ *
+ * @param modules - Modules to filter.
+ * @param include - Optional regex pattern string; only matching module IDs are kept.
+ * @param exclude - Optional regex pattern string; matching module IDs are removed.
+ * @returns Filtered array of modules.
+ * @throws {SyntaxError} When `include` or `exclude` contain an invalid regex pattern.
+ */
+export function filterModules(
+  modules: ScannedModule[],
+  include?: string,
+  exclude?: string,
+): ScannedModule[] {
+  let result = modules;
+
+  if (include != null) {
+    const re = new RegExp(include);
+    result = result.filter((m) => re.test(m.moduleId));
+  }
+
+  if (exclude != null) {
+    const re = new RegExp(exclude);
+    result = result.filter((m) => !re.test(m.moduleId));
+  }
+
+  return result;
+}
+
+/**
+ * Deduplicate module IDs by appending a numeric suffix to colliding entries.
+ *
+ * Module-level free function — the canonical implementation. The
+ * {@link BaseScanner.deduplicateIds} instance method delegates here.
+ * Cross-language siblings: Python's ``apcore_toolkit.deduplicate_ids``
+ * and Rust's ``apcore_toolkit::deduplicate_ids``.
+ */
+export function deduplicateIds(modules: ScannedModule[]): ScannedModule[] {
+  const seenCount = new Map<string, number>();
+  // Pre-populate with all original IDs so generated suffixes never collide
+  // with an ID that already exists in the input list.
+  const usedIds = new Set<string>(modules.map((m) => m.moduleId));
+  const result: ScannedModule[] = [];
+
+  for (const module of modules) {
+    const mid = module.moduleId;
+    const count = seenCount.get(mid) ?? 0;
+    seenCount.set(mid, count + 1);
+
+    if (count > 0) {
+      let counter = count + 1;
+      let newId = `${mid}_${counter}`;
+      while (usedIds.has(newId)) {
+        counter++;
+        newId = `${mid}_${counter}`;
+      }
+      usedIds.add(newId);
+      result.push(
+        cloneModule(module, {
+          moduleId: newId,
+          warnings: [
+            ...module.warnings,
+            `Module ID renamed from '${mid}' to '${newId}' to avoid collision`,
+          ],
+        }),
+      );
+    } else {
+      result.push(module);
+    }
+  }
+
+  return result;
+}
+
 
 /**
  * Abstract base class for all apcore-toolkit scanners.
@@ -80,19 +160,7 @@ export abstract class BaseScanner {
     include?: string,
     exclude?: string,
   ): ScannedModule[] {
-    let result = modules;
-
-    if (include != null) {
-      const re = new RegExp(include);
-      result = result.filter((m) => re.test(m.moduleId));
-    }
-
-    if (exclude != null) {
-      const re = new RegExp(exclude);
-      result = result.filter((m) => !re.test(m.moduleId));
-    }
-
-    return result;
+    return filterModules(modules, include, exclude);
   }
 
   /**
@@ -133,39 +201,6 @@ export abstract class BaseScanner {
   }
 
   deduplicateIds(modules: ScannedModule[]): ScannedModule[] {
-    const seenCount = new Map<string, number>();
-    // Pre-populate with all original IDs so generated suffixes never collide
-    // with an ID that already exists in the input list.
-    const usedIds = new Set<string>(modules.map((m) => m.moduleId));
-    const result: ScannedModule[] = [];
-
-    for (const module of modules) {
-      const mid = module.moduleId;
-      const count = seenCount.get(mid) ?? 0;
-      seenCount.set(mid, count + 1);
-
-      if (count > 0) {
-        let counter = count + 1;
-        let newId = `${mid}_${counter}`;
-        while (usedIds.has(newId)) {
-          counter++;
-          newId = `${mid}_${counter}`;
-        }
-        usedIds.add(newId);
-        result.push(
-          cloneModule(module, {
-            moduleId: newId,
-            warnings: [
-              ...module.warnings,
-              `Module ID renamed from '${mid}' to '${newId}' to avoid collision`,
-            ],
-          }),
-        );
-      } else {
-        result.push(module);
-      }
-    }
-
-    return result;
+    return deduplicateIds(modules);
   }
 }
