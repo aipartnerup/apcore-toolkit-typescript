@@ -1,10 +1,11 @@
 # Changelog
 
 
-## [0.6.0] - 2026-05-05
+## [0.6.0] - 2026-05-07
 
 ### Changed
 
+- **`apcore-js` minimum version bumped from 0.20.0 to 0.21.0** — `package.json` `dependencies` now requires `apcore-js >=0.21.0`. Toolkit only imports stable apcore-js surface (`ModuleAnnotations`, `DEFAULT_ANNOTATIONS`, `ModuleExample`, `Context`, `FunctionModule`, `jsonSchemaToTypeBox`, `annotationsFromJSON`, `annotationsToJSON`); the 0.21.0 additions (`discoverable` field on `ModuleAnnotations`, `PreviewResult`, `Change`, `ephemeral.*` namespace) are automatically handled — `annotationsFromJSON` / `annotationsToJSON` already serialize `discoverable`, and `inferAnnotationsFromMethod` spreads `DEFAULT_ANNOTATIONS` so the new field propagates without code changes. `AIEnhancer` derives its annotation field set from `Object.entries(DEFAULT_ANNOTATIONS)` at load time, so it also picks up `discoverable` automatically. Full vitest suite + `tsc --noEmit` verified against apcore-js 0.21.0.
 - **`apcore-js` minimum version bumped from 0.19.0 to 0.20.0** — `package.json` `dependencies` now requires `apcore-js >=0.20.0`; `pnpm-lock.yaml` regenerated to `apcore-js@0.20.0`. Toolkit only imports stable apcore-js surface (`ModuleAnnotations`, `DEFAULT_ANNOTATIONS`, `ModuleExample`, `Context`, `FunctionModule`, `jsonSchemaToTypeBox`, `annotationsFromJSON`, `annotationsToJSON`); none of these were affected by 0.20.0 changes. Full vitest suite (490 passed) + `tsc --noEmit` clean against apcore-js 0.20.0.
 
 ### Added
