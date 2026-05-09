@@ -76,8 +76,5 @@
   },
   "apdev": {
     "base_package": "apcore-toolkit"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
   }
 }
