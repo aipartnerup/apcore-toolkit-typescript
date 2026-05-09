@@ -1,6 +1,19 @@
 # Changelog
 
 
+## [0.6.1] - 2026-05-09
+
+### Changed
+
+- **`apcore-js` minimum version bumped from 0.21.0 to 0.21.1** —
+  `package.json` `dependencies` now requires `apcore-js >=0.21.1`.
+  Picks up the apcore-js 0.21.1 fix for the Bun init-time deadlock
+  caused by top-level `await import('node:*')` chains. Toolkit's own
+  imports from apcore-js are unchanged (still pure types + browser-
+  safe helpers); 25 vitest test files / 541 tests pass against
+  apcore-js 0.21.1.
+
+
 ## [0.6.0] - 2026-05-07
 
 ### Changed
