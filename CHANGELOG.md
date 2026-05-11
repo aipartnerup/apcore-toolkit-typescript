@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0] - 2026-05-11
+
+### Added
+
+- **`formatCsv(rows, options?)` and `formatJsonl(rows)`** — byte-equivalent tabular data formatters. Lives in `src/formatting/tabular.ts`; re-exported from the package root. Cross-SDK byte-identity contract: Python / TypeScript / Rust SDKs emit identical bytes for the same input. Asserted via shared conformance corpus at `apcore-toolkit/conformance/fixtures/`.
+- **`FormatCsvOptions`** type exposing the `bom` flag for Excel-locale users.
+
+### CSV / JSONL canonical contract
+
+- **CSV**: header = union of keys across all rows in insertion-order (fixes apcore-cli-typescript heterogeneous-keys data-loss bug at `src/output.ts:347-354`). Non-scalar cells = `JSON.stringify(value)`. RFC 4180 CRLF terminator. `,` / `"` / `\n` / `\r` quote-wrapped, embedded `"` doubled.
+- **JSONL**: canonical compact `JSON.stringify` per row, LF terminator, no trailing blank.
+- **Numbers**: NaN/Infinity collapse to empty CSV cell / JSON `null` (matching JS default). Insertion-order keys preserved via JS object property ordering.
+
+### Why
+
+Per-SDK reimplementations of csv/jsonl had accumulated divergence. The spec MUST language couldn't enforce conformance on downstream consumers (e.g. aisee-cli) that reimplemented their own emission. See `apcore-cli/docs/tech-design.md` ADR-09 for the tier-split rationale.
 
 ## [0.6.1] - 2026-05-09
 

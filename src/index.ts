@@ -37,6 +37,8 @@ export {
   formatSchema,
   formatModule,
   formatModules,
+  formatCsv,
+  formatJsonl,
 } from './formatting/index.js';
 export type {
   SchemaStyle,
@@ -45,6 +47,7 @@ export type {
   FormatSchemaOptions,
   FormatModuleOptions,
   FormatModulesOptions,
+  FormatCsvOptions,
 } from './formatting/index.js';
 export { AIEnhancer } from './ai-enhancer.js';
 export type { AIEnhancerOptions, Enhancer } from './ai-enhancer.js';

@@ -12,3 +12,5 @@ export type {
   FormatModuleOptions,
   FormatModulesOptions,
 } from './surface.js';
+export { formatCsv, formatJsonl } from './tabular.js';
+export type { FormatCsvOptions } from './tabular.js';

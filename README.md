@@ -105,6 +105,33 @@ const md = toMarkdown(data, {
 });
 ```
 
+### Tabular Formats (v0.7.0)
+
+Byte-equivalent CSV / JSONL emitters with a cross-SDK conformance contract — TypeScript, Python, and Rust produce identical bytes for the same input.
+
+```typescript
+import { formatCsv, formatJsonl } from 'apcore-toolkit';
+
+const rows = [
+  { sn: 1, title: 'First', score: 78 },
+  { sn: 2, title: 'Second', score: 82, description: 'later-only field' },
+];
+
+// CSV: header = union of keys across all rows (no silent data loss on
+// heterogeneous rows); nested values serialized via JSON.stringify; RFC 4180
+// CRLF line terminator.
+process.stdout.write(formatCsv(rows));
+// sn,title,score,description\r\n1,First,78,\r\n2,Second,82,later-only field\r\n
+
+// JSONL: canonical compact JSON per row, LF terminator, no trailing blank.
+process.stdout.write(formatJsonl(rows));
+
+// UTF-8 BOM for Excel locales (default off for pipeline consumers):
+process.stdout.write(formatCsv(rows, { bom: true }));
+```
+
+See `apcore-toolkit/docs/features/formatting.md` § Tabular Formats for the full contract and `apcore-toolkit/conformance/fixtures/format_csv.json` / `format_jsonl.json` for the shared cross-SDK test corpus.
+
 ### Serializers
 
 ```typescript
@@ -185,6 +212,8 @@ The **Browser** column marks whether a symbol is also re-exported from
 | `deepResolveRefs()` | ✓ | Recursively resolve all nested `$ref` pointers in a schema |
 | `enrichSchemaDescriptions()` | ✓ | Merge parameter descriptions into schema |
 | `toMarkdown()` | ✓ | Convert dict to formatted Markdown |
+| `formatCsv()` _(v0.7.0)_ | ✓ | Byte-equivalent RFC 4180 CSV. Header = union of keys; canonical JSON for nested cells; CRLF terminator |
+| `formatJsonl()` _(v0.7.0)_ | ✓ | Byte-equivalent JSON Lines. Compact JSON per row, LF terminator |
 | `moduleToDict()` | ✓ | Serialize module to snake_case dict |
 | `modulesToDicts()` | ✓ | Batch serialize modules |
 | `annotationsToDict()` | ✓ | Convert annotations to plain dict |
