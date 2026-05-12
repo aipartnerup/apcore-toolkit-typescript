@@ -94,18 +94,21 @@ export class BindingLoader extends BindingParser {
       if (recursive) {
         files = this._collectRecursive(filePath).sort();
       } else {
-        const allEntries = fs
+        files = fs
           .readdirSync(filePath)
-          .filter((f) => f.endsWith('.binding.yaml'));
-        if (allEntries.length > MAX_BINDING_FILES_PER_DIR) {
-          throw new BindingLoadError({
-            reason: `too many files in directory: ${allEntries.length} exceeds limit of ${MAX_BINDING_FILES_PER_DIR}`,
-            filePath,
-          });
-        }
-        files = allEntries
+          .filter((f) => f.endsWith('.binding.yaml'))
           .sort()
           .map((f) => path.join(filePath, f));
+      }
+      // Enforce the per-directory file-count cap on the merged list so the
+      // recursive branch is bounded too. Rust and Python apply the cap
+      // unconditionally; the previous TypeScript implementation only
+      // checked the non-recursive branch (A-D-013).
+      if (files.length > MAX_BINDING_FILES_PER_DIR) {
+        throw new BindingLoadError({
+          reason: `too many files in directory: ${files.length} exceeds limit of ${MAX_BINDING_FILES_PER_DIR}`,
+          filePath,
+        });
       }
     } else {
       throw new BindingLoadError({

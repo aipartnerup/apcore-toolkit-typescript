@@ -170,6 +170,27 @@ export class HTTPProxyRegistryWriter {
       );
     }
     this.fetchImpl = f;
+
+    // Validate `baseUrl` scheme up-front so a misconfigured writer fails at
+    // construction rather than per request. Mirrors Rust's `InvalidBaseUrl`
+    // check in `apcore-toolkit-rust/src/output/http_proxy_writer.rs`. Only
+    // `http` and `https` are accepted — `file://`, `data://`, etc. would be
+    // surprising attack surface for a writer that forwards arbitrary inputs.
+    let parsed: URL;
+    try {
+      parsed = new URL(options.baseUrl);
+    } catch {
+      throw new HTTPProxyRegistryWriterError(
+        'constructor',
+        `Invalid base_url ${JSON.stringify(options.baseUrl)} — must be a valid absolute URL`,
+      );
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new HTTPProxyRegistryWriterError(
+        'constructor',
+        `Invalid base_url protocol "${parsed.protocol}" — must be http or https`,
+      );
+    }
   }
 
   /**

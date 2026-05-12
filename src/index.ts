@@ -72,6 +72,7 @@ export type {
 } from './output/http-proxy-writer.js';
 export { getWriter } from './output/factory.js';
 export type { WriteResult, VerifyResult, Verifier } from './output/types.js';
+export { createWriteResult } from './output/types.js';
 export { WriteError, InvalidFormatError } from './output/errors.js';
 export {
   YAMLVerifier,

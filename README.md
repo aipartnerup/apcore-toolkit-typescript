@@ -203,7 +203,7 @@ The **Browser** column marks whether a symbol is also re-exported from
 | `TypeScriptWriter` | | Generates TypeScript module wrappers |
 | `RegistryWriter` | | Registers modules into an apcore Registry |
 | `HTTPProxyRegistryWriter` | ✓ | Registers modules as HTTP-proxied entries in an in-memory registry. Each module's `execute()` forwards inputs to a backend URL via global `fetch`. Works in any runtime with `fetch` (Node 20+, browsers, edge, workers). |
-| `HTTPProxyWriterError` | ✓ | Error class thrown when HTTP fields cannot be extracted from a `ScannedModule` |
+| `HTTPProxyRegistryWriterError` | ✓ | Error class thrown when HTTP fields cannot be extracted from a `ScannedModule` |
 | `getWriter()` | | Factory for writer instances |
 | `extractInputSchema()` | ✓ | Extract input schema from OpenAPI operation |
 | `extractOutputSchema()` | ✓ | Extract output schema from OpenAPI operation |

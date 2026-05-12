@@ -17,6 +17,25 @@
 
 Per-SDK reimplementations of csv/jsonl had accumulated divergence. The spec MUST language couldn't enforce conformance on downstream consumers (e.g. aisee-cli) that reimplemented their own emission. See `apcore-cli/docs/tech-design.md` ADR-09 for the tier-split rationale.
 
+### Notes
+
+- **YAML is intentionally not in this tier yet.** Each idiomatic YAML library (PyYAML, js-yaml, serde_yaml_ng) emits different forms even for identical input. Byte-equivalence requires a custom emitter, which is deferred. YAML remains SDK-native (Tier 2) and may differ across languages.
+- Integers exceeding `Number.MAX_SAFE_INTEGER` (`2^53 - 1`) are not portable across SDKs; callers should serialize them as JSON strings.
+
+### Cross-SDK reconciliation (post-audit, no TypeScript code change)
+
+The 2026-05-12 cross-SDK audit (`/apcore-skills:audit --scope toolkit`) reconciled spec text and implementations across the three toolkit SDKs. The TypeScript surface is unchanged in 0.7.0 beyond the tabular formatters above — the audit found TypeScript already implemented the canonical behaviour for the relevant contracts. Spec updates that now formally guarantee TypeScript behaviour cross-SDK:
+
+- **`getWriter` HTTP-proxy aliases** (D10-003) — `getWriter("http_proxy", { baseUrl })` and `getWriter("httpproxy", { baseUrl })` were already accepted by the TypeScript factory (Issue #5). The 0.7.0 release elevates this to a cross-SDK guarantee: `apcore-toolkit-python` 0.7.0 now also accepts the aliases. Spec: `apcore-toolkit/docs/features/output-writers.md` § Contract: get_writer.
+- **`resolveRef` prototype-pollution guard** (D10-004) — TypeScript's `PROTO_DENY_LIST` (blocks `__proto__` / `constructor` / `prototype` JSON-pointer segments) is now formally documented in `apcore-toolkit/docs/features/openapi.md` as a TypeScript-only language-specific hardening. Behaviour unchanged.
+- **`format_module` / `format_modules` error contract** (D10-005) — spec now declares that the `Err(FormatError)` text in `format_module` / `format_modules` documents the Rust enum behaviour; the Python `Error` and TypeScript `Error` raised on unknown style values continue to apply. No TypeScript change.
+- **`DisplayResolver.resolve` error contract** (D10-006) — spec narrowed the `### Errors` block to "MCP alias validation only", matching the warn-and-continue behaviour TypeScript already implements for invalid `binding_data` shape. No TypeScript change.
+- **`apcore-toolkit-rust` error rename** (D1-001) — Rust renamed `OutputFormatError` to `InvalidFormatError` for symbol parity with TypeScript's existing `InvalidFormatError`. TypeScript surface unchanged; cross-language porting is now grep-aligned.
+
+### Test suite
+
+- 588 tests pass (unchanged from baseline). No new tests added — TypeScript behaviour is unchanged by this reconciliation pass.
+
 ## [0.6.1] - 2026-05-09
 
 ### Changed
@@ -95,7 +114,7 @@ Per-SDK reimplementations of csv/jsonl had accumulated divergence. The spec MUST
 ### Added (browser / edge runtime subpath)
 
 - **`apcore-toolkit/browser`** — new subpath export that exposes the runtime-neutral subset of the toolkit. Intended for consumers that bundle apcore-toolkit into a browser, edge runtime, or worker environment (e.g. `tiptap-apcore`). The default entry point continues to re-export the full Node-capable surface unchanged — this subpath is strictly additive; existing consumers (`nestjs-apcore` et al.) see zero API changes.
-  - Exposes: `ScannedModule` / `createScannedModule` / `cloneModule`, `BaseScanner`, the HTTP verb mapping helpers, `enrichSchemaDescriptions`, the OpenAPI resolvers (`resolveRef` / `resolveSchema` / `deepResolveRefs` / `extractInputSchema` / `extractOutputSchema`), the serializers (`annotationsToDict` / `moduleToDict` / `modulesToDicts`), `toMarkdown`, `BindingParser` / `parseBindingDocument` / `BindingLoadError`, the write-pipeline types (`WriteResult` / `VerifyResult` / `Verifier` / `createWriteResult` / `WriteError` / `InvalidFormatError`), `RegistryVerifier` / `runVerifierChain`, and `HTTPProxyRegistryWriter` / `HTTPProxyWriterError`.
+  - Exposes: `ScannedModule` / `createScannedModule` / `cloneModule`, `BaseScanner`, the HTTP verb mapping helpers, `enrichSchemaDescriptions`, the OpenAPI resolvers (`resolveRef` / `resolveSchema` / `deepResolveRefs` / `extractInputSchema` / `extractOutputSchema`), the serializers (`annotationsToDict` / `moduleToDict` / `modulesToDicts`), `toMarkdown`, `BindingParser` / `parseBindingDocument` / `BindingLoadError`, the write-pipeline types (`WriteResult` / `VerifyResult` / `Verifier` / `createWriteResult` / `WriteError` / `InvalidFormatError`), `RegistryVerifier` / `runVerifierChain`, and `HTTPProxyRegistryWriter` / `HTTPProxyRegistryWriterError`.
   - Excludes (Node-only): `YAMLWriter`, `TypeScriptWriter`, `RegistryWriter`, `getWriter`, `BindingLoader` (the fs-reading subclass — use `BindingParser` instead), `DisplayResolver`, `AIEnhancer`, `resolveTarget`, the file-based verifiers (`YAMLVerifier`, `SyntaxVerifier`, `MagicBytesVerifier`, `JSONVerifier`), and `VERSION`. These touch `node:fs` / `node:path` / `node:module` / `process.*` and cannot be safely bundled for browsers.
 - **`BindingParser`** — new class at `src/binding-parser.ts` that owns the runtime-neutral binding document parsing logic. `BindingLoader` is now a subclass that adds `load(filePath)` for filesystem loading. `BindingLoader.loadData(data)` continues to work unchanged (inherited). Mirrors the `load_data` split available on the Python `BindingLoader` class.
 - **`parseBindingDocument(raw, options?, filePath?)`** — standalone function form of `BindingParser.loadData`, with an optional explicit `filePath` for richer `BindingLoadError` messages when the document came from a known file location.

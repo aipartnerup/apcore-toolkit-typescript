@@ -252,4 +252,58 @@ describe('HTTPProxyRegistryWriter', () => {
     expect(typeof pkg.HTTPProxyRegistryWriter).toBe('function');
     expect(typeof pkg.HTTPProxyRegistryWriterError).toBe('function');
   });
+
+  // A-D-009 — base_url scheme validation at construction time. Mirrors Rust's
+  // `InvalidBaseUrl` check; prevents `file://` / `data://` / etc. exfiltration
+  // vectors at request time by failing the writer up-front.
+  describe('base_url scheme validation (A-D-009)', () => {
+    const dummyFetch: typeof fetch = async () => new Response('{}');
+
+    it('rejects file:// scheme at construction', () => {
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'file:///etc/passwd',
+            fetchImpl: dummyFetch,
+          }),
+      ).toThrow(HTTPProxyRegistryWriterError);
+    });
+
+    it('rejects data: scheme at construction', () => {
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'data:text/plain;base64,SGVsbG8=',
+            fetchImpl: dummyFetch,
+          }),
+      ).toThrow(HTTPProxyRegistryWriterError);
+    });
+
+    it('rejects malformed URL strings at construction', () => {
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'not a url',
+            fetchImpl: dummyFetch,
+          }),
+      ).toThrow(HTTPProxyRegistryWriterError);
+    });
+
+    it('accepts http:// and https:// base URLs', () => {
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'http://localhost:8000',
+            fetchImpl: dummyFetch,
+          }),
+      ).not.toThrow();
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'https://api.example.com',
+            fetchImpl: dummyFetch,
+          }),
+      ).not.toThrow();
+    });
+  });
 });

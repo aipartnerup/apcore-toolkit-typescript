@@ -111,4 +111,48 @@ describe('BindingLoader — file count limit (D11-006)', () => {
       expect((exc as BindingLoadError).message).toMatch(/too many|files/i);
     }
   });
+
+  // A-D-013 — the recursive branch must enforce MAX_BINDING_FILES_PER_DIR
+  // too. Earlier, only the non-recursive branch checked the cap, so a
+  // recursive load with > 10_000 files would silently succeed and pin
+  // memory.
+  it('throws BindingLoadError when recursive scan yields more than 10,000 files', async () => {
+    const fsModule = await import('node:fs');
+    const origReaddir = fsModule.readdirSync;
+    const fakeNames = Array.from({ length: 10001 }, (_, i) => `f${i}.binding.yaml`);
+
+    vi.spyOn(fsModule, 'readdirSync').mockImplementation(((
+      p: Parameters<typeof fsModule.readdirSync>[0],
+      opts?: Parameters<typeof fsModule.readdirSync>[1],
+    ) => {
+      // The recursive branch calls readdirSync(dir, { withFileTypes: true }).
+      // Return Dirent-like entries that report as plain files with our names.
+      if (
+        String(p) === tmpDir &&
+        opts !== undefined &&
+        typeof opts === 'object' &&
+        (opts as { withFileTypes?: boolean }).withFileTypes === true
+      ) {
+        const dirents = fakeNames.map((name) => ({
+          name,
+          isDirectory: () => false,
+          isFile: () => true,
+          isSymbolicLink: () => false,
+        }));
+        return dirents as unknown as ReturnType<typeof fsModule.readdirSync>;
+      }
+      return (origReaddir as typeof fsModule.readdirSync)(
+        p,
+        opts as Parameters<typeof fsModule.readdirSync>[1],
+      );
+    }) as typeof fsModule.readdirSync);
+
+    expect(() => loader.load(tmpDir, false, true)).toThrow(BindingLoadError);
+    try {
+      loader.load(tmpDir, false, true);
+    } catch (exc) {
+      expect(exc).toBeInstanceOf(BindingLoadError);
+      expect((exc as BindingLoadError).message).toMatch(/too many|files/i);
+    }
+  });
 });

@@ -23,8 +23,23 @@ export class YAMLWriter {
    *
    * @param modules - Scanned modules to write.
    * @param outputDir - Directory to write binding files into (created if absent).
-   * @param options - Optional write options: `dryRun`, `verify`, `verifiers`.
+   * @param options - Optional write options: `dryRun`, `verify`, `verifiers`,
+   *   `errorMode: "throw" | "collect"` (default `"throw"`). With `"throw"`,
+   *   the first per-module write failure raises a {@link WriteError} and
+   *   aborts the batch; with `"collect"`, per-module failures are recorded
+   *   as `WriteResult` entries with `verified: false` and a non-null
+   *   `verificationError`, and the batch continues. Mirrors the same flag
+   *   on {@link RegistryWriter} and the Python / Rust SDKs.
    * @returns Array of WriteResult, one per module.
+   *
+   * @example
+   * ```ts
+   * // "collect" mode — never throws on a single bad module
+   * const results = new YAMLWriter().write(modules, './bindings', {
+   *   errorMode: 'collect',
+   * });
+   * const failed = results.filter((r) => !r.verified);
+   * ```
    */
   write(
     modules: ScannedModule[],
