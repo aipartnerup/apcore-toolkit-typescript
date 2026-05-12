@@ -780,21 +780,27 @@ describe('DisplayResolver', () => {
     });
   });
 
-  // C6 regression: _loadBindingFiles must skip symlinks
-  describe('_loadBindingFiles — symlink guard', () => {
-    it('skips binding files that are symlinks', () => {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dr-c6-'));
+  // Cross-SDK parity (D10-W1): _loadBindingFiles follows symlinks, matching
+  // Python+Rust DisplayResolver behavior and TS's own BindingLoader.
+  describe('_loadBindingFiles — follows symlinks (cross-SDK parity)', () => {
+    it('loads binding entries from a symlinked file', () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dr-symlink-'));
       const realFile = path.join(tmpDir, 'real.binding.yaml');
       const linkFile = path.join(tmpDir, 'linked.binding.yaml');
       fs.writeFileSync(realFile, 'bindings:\n  - module_id: test.mod\n    display:\n      alias: safe\n');
-      fs.symlinkSync(realFile, linkFile);
+      fs.unlinkSync(realFile);
+      const realInOtherDir = path.join(tmpDir, 'data.yaml');
+      fs.writeFileSync(realInOtherDir, 'bindings:\n  - module_id: test.mod\n    display:\n      alias: safe\n');
+      fs.symlinkSync(realInOtherDir, linkFile);
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const resolver = new DisplayResolver();
       const m = mod({ moduleId: 'test.mod' });
-      resolver.resolve([m], { bindingPath: tmpDir });
+      const [resolved] = resolver.resolve([m], { bindingPath: tmpDir });
+      const display = resolved.metadata?.['display'] as Record<string, unknown> | undefined;
 
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('symlink'));
+      expect(display?.['alias']).toBe('safe');
+      expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('symlink'));
       warnSpy.mockRestore();
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });

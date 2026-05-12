@@ -74,7 +74,7 @@ describe('formatCsv — local unit tests', () => {
   });
 
   it('BOM option', () => {
-    expect(formatCsv([{ a: 1 }], { bom: true })).toBe('a\r\n1\r\n');
+    expect(formatCsv([{ a: 1 }], { bom: true })).toBe('\uFEFFa\r\n1\r\n');
     expect(formatCsv([{ a: 1 }])).toBe('a\r\n1\r\n');
   });
 });
@@ -99,7 +99,6 @@ describe('formatJsonl — local unit tests', () => {
       '{"schema":{"type":"object"}}\n',
     );
   });
-
 });
 
 const csvCases = loadFixture('format_csv.json');

@@ -110,18 +110,14 @@ export class RegistryWriter {
       outputSchema: jsonSchemaToTypeBox(mod.outputSchema),
       description: mod.description,
       documentation: mod.documentation,
-      tags: mod.tags.length > 0 ? [...mod.tags] : null,
+      tags: [...mod.tags],
       version: mod.version,
       // FunctionModule.annotations stores its input as-is, so we must pass the
       // camelCase runtime ModuleAnnotations (not the snake_case wire form
       // emitted by annotationsToDict, which is for YAML/serializer output).
       annotations: mod.annotations,
-      metadata: Object.keys(mod.metadata).length > 0 ? { ...mod.metadata } : null,
-      examples: mod.examples.length > 0 ? ([...mod.examples] as ModuleExample[]) : null,
-      // NOTE: ScannedModule carries a `display` field (populated by DisplayResolver).
-      // FunctionModule in apcore-js does not currently expose a display slot, so
-      // the display metadata is intentionally omitted here. In Rust, ModuleDescriptor
-      // includes a display field — once apcore-js exposes one, wire it here.
+      metadata: { ...mod.metadata },
+      examples: [...mod.examples] as ModuleExample[],
     });
   }
 }

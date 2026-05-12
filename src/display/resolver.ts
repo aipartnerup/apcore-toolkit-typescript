@@ -168,16 +168,6 @@ export class DisplayResolver {
     }
 
     for (const f of files) {
-      try {
-        const lstat = fs.lstatSync(f);
-        if (lstat.isSymbolicLink()) {
-          console.warn(`DisplayResolver: skipping symlink ${f}`);
-          continue;
-        }
-      } catch (exc) {
-        console.warn(`DisplayResolver: failed to stat ${f}: ${exc}`);
-        continue;
-      }
       let content: string;
       try {
         content = fs.readFileSync(f, 'utf-8');
@@ -235,8 +225,8 @@ export class DisplayResolver {
     const defaultDescription: string =
       DisplayResolver._asStr(displayCfg['description']) || bindingDesc || mod.description;
     const defaultDocumentation: string | null =
-      DisplayResolver._asStr(displayCfg['documentation']) ?? bindingDocs ?? mod.documentation ?? null;
-    const defaultGuidance: string | null = DisplayResolver._asStr(displayCfg['guidance']) ?? null;
+      DisplayResolver._asStr(displayCfg['documentation']) || bindingDocs || mod.documentation || null;
+    const defaultGuidance: string | null = DisplayResolver._asStr(displayCfg['guidance']) || null;
     const resolvedTags: string[] = displayCfg['tags'] !== undefined
       ? DisplayResolver._asStrArray(displayCfg['tags'], mod.tags)
       : DisplayResolver._asStrArray(entry['tags'] !== undefined ? entry['tags'] : mod.tags, mod.tags);
@@ -251,7 +241,7 @@ export class DisplayResolver {
         surface: {
           alias: DisplayResolver._asStr(sc['alias']) || defaultAlias,
           description: DisplayResolver._asStr(sc['description']) || defaultDescription,
-          guidance: DisplayResolver._asStr(sc['guidance']) ?? defaultGuidance,
+          guidance: DisplayResolver._asStr(sc['guidance']) || defaultGuidance,
         },
         aliasExplicit,
       };

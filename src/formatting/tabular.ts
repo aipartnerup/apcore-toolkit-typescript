@@ -9,7 +9,7 @@
  * See apcore-toolkit/docs/features/formatting.md § Tabular Formats.
  */
 
-const BOM = "";
+const BOM = "\uFEFF";
 
 export interface FormatCsvOptions {
   /** Prepend a UTF-8 BOM for Excel-locale users. Default false. */

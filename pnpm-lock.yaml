@@ -15,7 +15,7 @@ importers:
         specifier: ^8.17.0
         version: 8.20.0
       apcore-js:
-        specifier: '>=0.21.1'
+        specifier: '>=0.21.0'
         version: 0.21.1
       js-yaml:
         specifier: ^4.1.0

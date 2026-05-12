@@ -1,6 +1,23 @@
 # Changelog
 
-## [0.7.0] - 2026-05-11
+
+## [0.7.0] - 2026-05-12
+
+### Fixed (post-audit cross-SDK reconciliation)
+
+- **`RegistryWriter._toFunctionModule` no longer strips `display`.** The resolved display lives in `metadata["display"]` (per `DisplayResolver`); the previous strip-display branch dropped it on the floor when round-tripping through the registry. Now `metadata` is passed through unchanged. Aligns with Python and Rust SDK behavior. (D11-001)
+- **`RegistryWriter._toFunctionModule` — empty-collection normalization.** Empty `tags` / `metadata` / `examples` are no longer coerced to `null`. Canonical cross-SDK rule: keep empty collections as `[]` / `{}` and reserve `null` for unset. Matches Python (post-fix) and Rust behavior. (D11-007)
+- **`DisplayResolver._loadBindingFiles` no longer skips symlinks.** Python and Rust DisplayResolvers follow symlinks transparently, and TS's own `BindingLoader` already does too. Removed the `lstatSync` symlink-skip block for cross-SDK parity. The corresponding regression test was inverted to assert symlinked binding files are loaded. (D10-W1)
+- **`DisplayResolver._resolveOne` — empty-string fallback alignment.** `??` chains on `documentation` and `guidance` (default and per-surface) now use `||` so that empty-string `guidance` falls through to the resolved default. Matches Python's `or` semantics and Rust's `str_or` filter. (D11-003)
+
+### Added
+
+- **`tests/display-resolve-conformance.test.ts`** — new cross-SDK conformance test wired to the shared fixture `apcore-toolkit/conformance/fixtures/display_resolve.json` (14 cases). Previously orphaned across all three SDKs. (D9-W1)
+
+### Changed
+
+- Annotated the `createWriteResult` export in `src/index.ts` as a TS-only ergonomic helper. Python and Rust callers construct `WriteResult` directly via dataclass/struct literals; the annotation documents the deliberate parity gap. (D1-W1)
+- Lowered the `apcore-js` runtime dep floor from `>=0.21.1` to `>=0.21.0` to align with the Python and Rust SDKs (which target `apcore 0.21.x` on PyPI / crates.io, where 0.21.1 is not published). (D3-W1, corrected direction)
 
 ### Added
 

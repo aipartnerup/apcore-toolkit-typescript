@@ -72,6 +72,8 @@ export type {
 } from './output/http-proxy-writer.js';
 export { getWriter } from './output/factory.js';
 export type { WriteResult, VerifyResult, Verifier } from './output/types.js';
+// TS-only ergonomic factory: Python/Rust callers construct WriteResult directly
+// via dataclass/struct literals. No counterpart in apcore-toolkit-python/-rust.
 export { createWriteResult } from './output/types.js';
 export { WriteError, InvalidFormatError } from './output/errors.js';
 export {
