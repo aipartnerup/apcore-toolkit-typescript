@@ -108,9 +108,15 @@ interface HttpFields {
 function getHttpFields(mod: ScannedModule): HttpFields {
   const metadata = (mod.metadata ?? {}) as Record<string, unknown>;
   const m = (mod as unknown as { httpMethod?: unknown }).httpMethod;
-  const httpMethod = (typeof m === 'string' && m) || (typeof metadata.httpMethod === 'string' && metadata.httpMethod) || 'GET';
+  const httpMethod = (typeof m === 'string' && m)
+    || (typeof metadata.http_method === 'string' && metadata.http_method)
+    || (typeof metadata.httpMethod === 'string' && metadata.httpMethod)
+    || 'GET';
   const p = (mod as unknown as { urlPath?: unknown }).urlPath;
-  let urlPath = (typeof p === 'string' && p) || (typeof metadata.urlPath === 'string' && metadata.urlPath) || '/';
+  let urlPath = (typeof p === 'string' && p)
+    || (typeof metadata.url_path === 'string' && metadata.url_path)
+    || (typeof metadata.urlPath === 'string' && metadata.urlPath)
+    || '/';
   urlPath = String(urlPath);
   if (/^(https?|file|ftp):\/\//i.test(urlPath)) {
     throw new HTTPProxyRegistryWriterError(

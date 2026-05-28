@@ -161,3 +161,60 @@ describe('RegistryWriter', () => {
     });
   });
 });
+
+// resolveTarget is already vi.mock'd at the top of the file.
+import { resolveTarget } from '../src/resolve-target.js';
+const mockResolveTarget = vi.mocked(resolveTarget);
+
+describe('streaming module detection (apcore 0.22.0)', () => {
+
+  it('wraps target with stream() as StreamingFunctionModule with STREAMING_MARKER', async () => {
+    const chunks: Record<string, unknown>[] = [{ chunk: 1 }, { chunk: 2 }];
+    async function* fakeStream(_inputs: Record<string, unknown>, _ctx: unknown) {
+      for (const c of chunks) yield c;
+    }
+    const streamingTarget = {
+      stream: fakeStream,
+    };
+    mockResolveTarget.mockResolvedValueOnce(streamingTarget as unknown as ((...args: unknown[]) => unknown));
+
+    const STREAMING_MARKER_SYM = Symbol.for('apcore.streaming');
+    const writer = new RegistryWriter();
+    const mod = createScannedModule({
+      ...REQUIRED_FIELDS,
+      moduleId: 'stream.test',
+      annotations: createAnnotations({ streaming: true }),
+    });
+    const registry = { register: vi.fn() };
+    const results = await writer.write([mod], registry);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].verified).toBe(true);
+    const registered = registry.register.mock.calls[0][1] as Record<symbol, unknown>;
+    expect(registered[STREAMING_MARKER_SYM]).toBe(true);
+    expect(typeof (registered as Record<string, unknown>)['stream']).toBe('function');
+  });
+
+  it('clears streaming flag and warns when target has no stream()', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const plainFn = (_inputs: Record<string, unknown>) => ({ result: 'ok' });
+    mockResolveTarget.mockResolvedValueOnce(plainFn as unknown as ((...args: unknown[]) => unknown));
+
+    const writer = new RegistryWriter();
+    const mod = createScannedModule({
+      ...REQUIRED_FIELDS,
+      moduleId: 'stream.no_impl',
+      annotations: createAnnotations({ streaming: true }),
+    });
+    const registry = { register: vi.fn() };
+    const results = await writer.write([mod], registry);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].verified).toBe(true);
+    const registered = registry.register.mock.calls[0][1] as Record<string, unknown>;
+    const ann = registered['annotations'] as Record<string, unknown> | null;
+    expect(ann?.['streaming']).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('streaming'));
+    warnSpy.mockRestore();
+  });
+});

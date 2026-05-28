@@ -188,12 +188,14 @@ export function extractInputSchema(
 
   const requestBody = (operation["requestBody"] ?? {}) as Record<string, unknown>;
   const content = (requestBody["content"] ?? {}) as Record<string, unknown>;
-  // Accept both standard application/json and JSON:API vnd content type
-  const jsonContent = (
-    content["application/json"] ??
-    content["application/vnd.api+json"] ??
-    {}
-  ) as Record<string, unknown>;
+  // Accept application/json (exact or with parameters like charset=utf-8),
+  // application/vnd.api+json, or any key starting with "application/json".
+  // Mirrors Python's startswith("application/json") behaviour.
+  const contentKeys = Object.keys(content);
+  const jsonKey = contentKeys.find(k => k === 'application/json')
+    ?? contentKeys.find(k => k.startsWith('application/json'))
+    ?? contentKeys.find(k => k === 'application/vnd.api+json');
+  const jsonContent = (jsonKey ? content[jsonKey] : {}) as Record<string, unknown>;
   const bodySchema = (jsonContent["schema"] ?? {}) as Record<string, unknown>;
 
   if (Object.keys(bodySchema).length > 0) {
@@ -237,11 +239,14 @@ export function extractOutputSchema(
   for (const statusCode of successCodes) {
     const response = responses[statusCode] as Record<string, unknown>;
     const content = (response["content"] ?? {}) as Record<string, unknown>;
-    const jsonContent = (
-      content["application/json"] ??
-      content["application/vnd.api+json"] ??
-      {}
-    ) as Record<string, unknown>;
+    // Accept application/json (exact or with parameters like charset=utf-8),
+    // application/vnd.api+json, or any key starting with "application/json".
+    // Mirrors Python's startswith("application/json") behaviour.
+    const respContentKeys = Object.keys(content);
+    const respJsonKey = respContentKeys.find(k => k === 'application/json')
+      ?? respContentKeys.find(k => k.startsWith('application/json'))
+      ?? respContentKeys.find(k => k === 'application/vnd.api+json');
+    const jsonContent = (respJsonKey ? content[respJsonKey] : {}) as Record<string, unknown>;
 
     if ("schema" in jsonContent) {
       let schema = resolveSchema(

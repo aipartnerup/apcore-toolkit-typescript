@@ -221,6 +221,30 @@ describe('MagicBytesVerifier', () => {
   });
 });
 
+// Issue 1 (BLOCKER): File-based verifiers must return ok:true for empty path
+// (registry-backed modules have no file path — Rust has `if path.is_empty()` guards)
+describe('empty-path guard — file-based verifiers', () => {
+  it('YAMLVerifier returns ok=true for empty path', () => {
+    const v = new YAMLVerifier();
+    expect(v.verify('', 'mod_id')).toEqual({ ok: true });
+  });
+
+  it('SyntaxVerifier returns ok=true for empty path', () => {
+    const v = new SyntaxVerifier();
+    expect(v.verify('', 'mod_id')).toEqual({ ok: true });
+  });
+
+  it('MagicBytesVerifier returns ok=true for empty path', () => {
+    const v = new MagicBytesVerifier(Buffer.from([0x89, 0x50]));
+    expect(v.verify('', 'mod_id')).toEqual({ ok: true });
+  });
+
+  it('JSONVerifier returns ok=true for empty path', () => {
+    const v = new JSONVerifier();
+    expect(v.verify('', 'mod_id')).toEqual({ ok: true });
+  });
+});
+
 // W23: runVerifierChain crash message should identify the crashing verifier
 describe('runVerifierChain', () => {
   it('returns ok:true when all verifiers pass', () => {

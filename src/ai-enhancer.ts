@@ -92,9 +92,15 @@ function parseIntEnv(name: string, fallback: number): number {
  *
  * Any class implementing this interface can be used to fill metadata gaps
  * in scanned modules. See the AI Enhancement Guide for details.
+ *
+ * Cross-SDK parity note: Python's `Enhancer` Protocol and Rust's `Enhancer` trait
+ * return `ScannedModule[]` (sync). TypeScript accepts both sync and async
+ * implementations via the union return type so that `AIEnhancer` (which performs
+ * real async network calls) satisfies the interface while pure-sync implementations
+ * (matching Python/Rust convention) also type-check without wrapping in a Promise.
  */
 export interface Enhancer {
-  enhance(modules: ScannedModule[]): Promise<ScannedModule[]>;
+  enhance(modules: ScannedModule[]): ScannedModule[] | Promise<ScannedModule[]>;
 }
 
 export interface AIEnhancerOptions {
@@ -117,9 +123,14 @@ export interface AIEnhancerOptions {
  * All AI-generated fields are tagged with `x-generated-by: slm` in the module
  * metadata for auditability.
  *
+ * TypeScript guards isEnabled() at call site per cross-SDK convention —
+ * callers should check `AIEnhancer.isEnabled()` before calling `enhance()`,
+ * matching Python/Rust behavior where `enhance()` does not check the flag internally.
+ *
  * @example
- * const enhancer = new AIEnhancer({ endpoint: 'http://localhost:11434/v1', model: 'qwen:0.6b' });
- * const enhanced = await enhancer.enhance(modules);
+ * if (AIEnhancer.isEnabled()) {
+ *   modules = await enhancer.enhance(modules);
+ * }
  */
 export class AIEnhancer {
   readonly endpoint: string;
@@ -162,7 +173,7 @@ export class AIEnhancer {
   }
 
   async enhance(modules: ScannedModule[]): Promise<ScannedModule[]> {
-    if (!AIEnhancer.isEnabled()) return modules;
+    // Callers should check AIEnhancer.isEnabled() before calling enhance() — matches Python/Rust convention
     const results: ScannedModule[] = [...modules];
 
     const pending: Array<{ idx: number; module: ScannedModule; gaps: string[] }> = [];

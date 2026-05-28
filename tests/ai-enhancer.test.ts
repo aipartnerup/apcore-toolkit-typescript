@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createAnnotations, DEFAULT_ANNOTATIONS } from 'apcore-js';
 import { AIEnhancer } from '../src/ai-enhancer.js';
+import type { Enhancer } from '../src/ai-enhancer.js';
 import { createScannedModule } from '../src/types.js';
+import type { ScannedModule } from '../src/types.js';
 
 describe('AIEnhancer', () => {
   const originalEnv = { ...process.env };
@@ -338,5 +340,40 @@ describe('AIEnhancer', () => {
     it('throws on bare triple-backtick (no content)', () => {
       expect(() => parse('```')).toThrow('SLM returned invalid JSON');
     });
+  });
+});
+
+// Issue 4: Enhancer interface must accept sync implementations (cross-SDK parity)
+// Python/Rust Enhancer protocol/trait is sync; TS union return type allows both.
+describe('Enhancer interface — sync implementation compiles and works', () => {
+  it('sync Enhancer implementation satisfies the Enhancer interface', async () => {
+    // This class returns ScannedModule[] (sync), not a Promise — must type-check.
+    class PassthroughEnhancer implements Enhancer {
+      enhance(modules: ScannedModule[]): ScannedModule[] {
+        return modules;
+      }
+    }
+
+    const enhancer: Enhancer = new PassthroughEnhancer();
+    const mod = createScannedModule({
+      moduleId: 'sync.test',
+      target: 'sync:fn',
+      description: 'sync test',
+      inputSchema: { type: 'object' },
+      outputSchema: { type: 'object' },
+      tags: [],
+    });
+
+    // Await handles both sync and async return values transparently.
+    const result = await Promise.resolve(enhancer.enhance([mod]));
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBe(mod);
+  });
+
+  it('AIEnhancer still satisfies Enhancer interface with async enhance()', () => {
+    // AIEnhancer.enhance() returns Promise<ScannedModule[]> — must still type-check.
+    const enhancer: Enhancer = new AIEnhancer();
+    expect(enhancer).toBeDefined();
+    expect(typeof enhancer.enhance).toBe('function');
   });
 });

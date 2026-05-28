@@ -23,6 +23,7 @@ function loadTypeScript(): typeof import('typescript') | null {
 
 export class YAMLVerifier implements Verifier {
   verify(path: string, _moduleId: string): VerifyResult {
+    if (!path) return { ok: true };
     try {
       const content = readFileSync(path, 'utf-8');
       const doc = yaml.load(content) as Record<string, unknown>;
@@ -69,6 +70,7 @@ function _flattenDiagnosticMessage(msg: unknown, depth = 0): string {
 
 export class SyntaxVerifier implements Verifier {
   verify(path: string, _moduleId: string): VerifyResult {
+    if (!path) return { ok: true };
     try {
       const content = readFileSync(path, 'utf-8');
       if (content.trim().length === 0) {
@@ -109,6 +111,7 @@ export class MagicBytesVerifier implements Verifier {
   }
 
   verify(path: string, _moduleId: string): VerifyResult {
+    if (!path) return { ok: true };
     let fd: number | undefined;
     try {
       fd = openSync(path, 'r');
@@ -141,6 +144,7 @@ export class JSONVerifier implements Verifier {
   }
 
   verify(path: string, _moduleId: string): VerifyResult {
+    if (!path) return { ok: true };
     let content: string;
     try {
       content = readFileSync(path, 'utf-8');

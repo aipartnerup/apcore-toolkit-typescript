@@ -306,4 +306,52 @@ describe('HTTPProxyRegistryWriter', () => {
       ).not.toThrow();
     });
   });
+
+  // Issue 2 (BLOCKER): HTTPProxyRegistryWriter must read snake_case metadata keys
+  // Python and Rust scanners produce http_method / url_path (snake_case).
+  describe('snake_case metadata key parity', () => {
+    it('reads snake_case http_method and url_path metadata keys', async () => {
+      const { fetchImpl, calls } = recordingFetch(() => jsonResponse(200, { ok: true }));
+      const writer = new HTTPProxyRegistryWriter({
+        baseUrl: 'http://localhost:8000',
+        fetchImpl,
+      });
+      const mod = createScannedModule({
+        moduleId: 'snake.module',
+        target: 'test:handler',
+        metadata: { http_method: 'POST', url_path: '/api/test' },
+        inputSchema: { type: 'object', additionalProperties: true },
+        outputSchema: { type: 'object', additionalProperties: true },
+        tags: [],
+      });
+      await writer.write([mod], registry);
+      const registered = getRegistered(registry, 'snake.module');
+      await registered.execute({ data: 'x' }, {} as Context);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe('POST');
+      expect(calls[0].url).toBe('http://localhost:8000/api/test');
+    });
+
+    it('falls back to camelCase httpMethod/urlPath when snake_case is absent', async () => {
+      const { fetchImpl, calls } = recordingFetch(() => jsonResponse(200, { ok: true }));
+      const writer = new HTTPProxyRegistryWriter({
+        baseUrl: 'http://localhost:8000',
+        fetchImpl,
+      });
+      const mod = createScannedModule({
+        moduleId: 'camel.module',
+        target: 'test:handler',
+        metadata: { httpMethod: 'DELETE', urlPath: '/api/items/1' },
+        inputSchema: { type: 'object', additionalProperties: true },
+        outputSchema: { type: 'object', additionalProperties: true },
+        tags: [],
+      });
+      await writer.write([mod], registry);
+      const registered = getRegistered(registry, 'camel.module');
+      await registered.execute({}, {} as Context);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe('DELETE');
+      expect(calls[0].url).toBe('http://localhost:8000/api/items/1');
+    });
+  });
 });

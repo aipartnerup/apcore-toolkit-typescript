@@ -15,8 +15,8 @@ importers:
         specifier: ^8.17.0
         version: 8.20.0
       apcore-js:
-        specifier: '>=0.21.0'
-        version: 0.21.1
+        specifier: '>=0.22.0'
+        version: 0.22.0
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.1
@@ -596,9 +596,9 @@ packages:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
 
-  apcore-js@0.21.1:
-    resolution: {integrity: sha512-CMGvufGeeHeonwNbA6XQoAUXtWfegi4wUYH0MYrKl0zIOiAkck9KDpW+yYyheWl/Wlhp0Mnf2VNUtCMDVvZ1VQ==}
-    engines: {node: '>=18.0.0'}
+  apcore-js@0.22.0:
+    resolution: {integrity: sha512-gjnK2CtvSPrJQBYqZ18xx9vdM492UFNL6HF/3fS40xRFdHHkOAfgdjS++bJ30Xc/VqlhWKLbkpdOfdZEZNMiWQ==}
+    engines: {node: '>=20.0.0'}
 
   apdev-js@0.2.4:
     resolution: {integrity: sha512-3ntgqrMOnRqR/orgy4gzF1gp6DBe9I9xWi+EmsSYWVnNZzylESKQCtkedmeP6GOCYtck3prnUo7MQI8ITU6Xuw==}
@@ -1702,7 +1702,7 @@ snapshots:
 
   ansi-styles@6.2.3: {}
 
-  apcore-js@0.21.1:
+  apcore-js@0.22.0:
     dependencies:
       '@sinclair/typebox': 0.34.48
       js-yaml: 4.1.1

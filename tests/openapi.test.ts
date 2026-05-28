@@ -719,6 +719,73 @@ describe("extractOutputSchema — 2xx range coverage (D11-001)", () => {
   });
 });
 
+// Issue 5 (WARNING): content-type prefix matching — accept charset-suffixed types
+describe("extractInputSchema — charset-suffixed content-type", () => {
+  it("accepts application/json; charset=utf-8 as requestBody content type", () => {
+    const operation = {
+      requestBody: {
+        content: {
+          "application/json; charset=utf-8": {
+            schema: {
+              type: "object",
+              properties: { name: { type: "string" } },
+              required: ["name"],
+            },
+          },
+        },
+      },
+    };
+    const result = extractInputSchema(operation as Record<string, unknown>);
+    expect((result.properties as Record<string, unknown>)).toHaveProperty("name");
+    expect(result.required).toContain("name");
+  });
+
+  it("prefers exact application/json over charset-suffixed variant", () => {
+    const operation = {
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: { fromExact: { type: "string" } },
+            },
+          },
+          "application/json; charset=utf-8": {
+            schema: {
+              type: "object",
+              properties: { fromCharset: { type: "string" } },
+            },
+          },
+        },
+      },
+    };
+    const result = extractInputSchema(operation as Record<string, unknown>);
+    expect((result.properties as Record<string, unknown>)).toHaveProperty("fromExact");
+    expect((result.properties as Record<string, unknown>)).not.toHaveProperty("fromCharset");
+  });
+});
+
+describe("extractOutputSchema — charset-suffixed content-type", () => {
+  it("accepts application/json; charset=utf-8 in response", () => {
+    const operation = {
+      responses: {
+        "200": {
+          content: {
+            "application/json; charset=utf-8": {
+              schema: {
+                type: "object",
+                properties: { id: { type: "integer" } },
+              },
+            },
+          },
+        },
+      },
+    };
+    const result = extractOutputSchema(operation as Record<string, unknown>);
+    expect((result.properties as Record<string, unknown>)).toHaveProperty("id");
+  });
+});
+
 // W8 regression: bodyRequired must filter proto keys and non-strings
 describe("extractInputSchema — bodyRequired filtering", () => {
   it("skips __proto__ entries in required array", () => {

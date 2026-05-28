@@ -102,6 +102,8 @@ import { BaseScanner as _BaseScanner } from './scanner.js';
 import type { ModuleAnnotations } from 'apcore-js';
 
 /**
+ * Parity shim — delegates to BaseScanner.inferAnnotationsFromMethod for cross-SDK API symmetry.
+ *
  * Infer behavioral annotations from an HTTP method string.
  * Package-level free function; thin wrapper over the static
  * {@link BaseScanner.inferAnnotationsFromMethod}.
