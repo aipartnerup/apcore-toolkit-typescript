@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2026-06-12
+
+Patch release. Bumps the required apcore runtime floor to 0.24.0. Toolkit API surface and code unchanged; all 603 tests pass without modification against 0.24.0.
+
+### Changed
+
+- Required runtime bumped to `apcore-js>=0.24.0` — bumped from `>=0.22.0`. Toolkit's stable surface is unaffected by the 0.22 → 0.24 delta.
+
+  Key 0.23.0–0.24.0 changes visible to toolkit users (indirect runtime effects):
+  - `Registry.unregister()` now correctly clears hot-reload/drain state (A-D-001) — re-registering after a direct `unregister()` no longer throws `ModuleNotFoundError`. Toolkit's `RegistryWriter.write()` calls `register` only, but callers who manually `unregister()` between `write()` calls benefit.
+  - Sensitive-key (`_secret_*`) redaction now recurses into array elements (A-D-003). Modules with sensitive keys inside nested array values are now properly redacted in apcore logs.
+  - `CALL_DEPTH_EXCEEDED` / `CIRCULAR_CALL` / `CALL_FREQUENCY_EXCEEDED` error `details` keys are now `snake_case` (A-D-019) — affects callers parsing `error.details` directly.
+  - `CircuitBreakerMiddleware` constructor is breaking in 0.23.0 (old `failure_threshold`/`success_threshold` removed). Toolkit does not use this middleware; no toolkit changes required.
+  - AI error-recovery metadata (`userFixable`, `aiGuidance`) is now auto-populated on `ModuleError` at the framework level (0.23.0).
+
 ## [0.8.0] - 2026-05-28
 
 Aligned release across Python, TypeScript, and Rust. Bumps the required apcore runtime to 0.22.0.
