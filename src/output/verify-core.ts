@@ -14,18 +14,22 @@
 import type { Verifier, VerifyResult } from './types.js';
 
 export class RegistryVerifier implements Verifier {
-  private readonly registry: { getModule?(id: string): unknown };
+  private readonly registry: { get?(id: string): unknown };
 
-  constructor(registry: { getModule?(id: string): unknown }) {
+  constructor(registry: { get?(id: string): unknown }) {
     this.registry = registry;
   }
 
   verify(_path: string, moduleId: string): VerifyResult {
     try {
-      if (typeof this.registry.getModule !== 'function') {
-        return { ok: false, error: 'Registry does not have a getModule method' };
+      // apcore's Registry exposes `get(id)` (matching apcore-python's
+      // `registry.get()` and apcore-rust's `registry.has()`); there is no
+      // `getModule`. Calling the right method is what makes verification
+      // actually work against a real Registry, not just a hand-rolled mock.
+      if (typeof this.registry.get !== 'function') {
+        return { ok: false, error: 'Registry does not have a get method' };
       }
-      const mod = this.registry.getModule(moduleId);
+      const mod = this.registry.get(moduleId);
       if (mod == null) {
         return { ok: false, error: `Module "${moduleId}" not found in registry` };
       }

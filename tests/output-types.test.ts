@@ -251,26 +251,26 @@ describe('MagicBytesVerifier', () => {
 
 describe('RegistryVerifier', () => {
   it('passes when module exists in registry', () => {
-    const registry = { getModule: (id: string) => ({ id }) };
+    const registry = { get: (id: string) => ({ id }) };
     const verifier = new RegistryVerifier(registry);
     const result = verifier.verify('/tmp/x', 'my-module');
     expect(result.ok).toBe(true);
   });
 
   it('fails when module not found in registry', () => {
-    const registry = { getModule: () => null };
+    const registry = { get: () => null };
     const verifier = new RegistryVerifier(registry);
     const result = verifier.verify('/tmp/x', 'missing');
     expect(result.ok).toBe(false);
     expect(result.error).toContain('missing');
   });
 
-  it('fails when registry lacks getModule method', () => {
+  it('fails when registry lacks get method', () => {
     const registry = {};
     const verifier = new RegistryVerifier(registry);
     const result = verifier.verify('/tmp/x', 'test');
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('getModule');
+    expect(result.error).toContain('get method');
   });
 });
 

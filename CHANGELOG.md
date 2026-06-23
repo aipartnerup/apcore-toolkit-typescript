@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-06-23
+
+Minor release. Fixes registry verification and async registration against the real apcore Registry. No public API changes; all 614 tests pass.
+
+### Fixed
+
+- **`RegistryVerifier` called `getModule()`, which apcore's `Registry` does not have** — apcore-js exposes `get(id)` (matching apcore-python's `registry.get()` and apcore-rust's `registry.has()`); there is no `getModule`. As a result, `RegistryWriter.write(..., { verify: true })` against a real `Registry` always reported every module as unverified. The verifier now calls `get(id)`. Existing tests passed only because they mocked a `{ getModule }` registry, masking the mismatch — those mocks are updated. (`output/verify-core.ts`)
+- **`RegistryWriter.write` did not `await` `registry.register()`** — apcore's `register()` returns `Promise<void>` and surfaces async `onLoad` / async-validator failures as a rejected promise. The unawaited call let those escape the `try/catch` as an unhandled rejection (which can crash Node) and ran verification before a deferred-publish `onLoad` had resolved. The call is now awaited. (`output/registry-writer.ts`)
+
+
 ## [0.8.1] - 2026-06-12
 
 Patch release. Bumps the required apcore runtime floor to 0.24.0. Toolkit API surface and code unchanged; all 603 tests pass without modification against 0.24.0.

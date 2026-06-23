@@ -73,7 +73,7 @@ export class RegistryWriter {
    */
   async write(
     modules: ScannedModule[],
-    registry: { register(moduleId: string, module: unknown): void; getModule?(id: string): unknown },
+    registry: { register(moduleId: string, module: unknown): void | Promise<void>; get?(id: string): unknown },
     options?: FileWriteOptions & { allowedPrefixes?: string[] },
   ): Promise<WriteResult[]> {
     const shouldVerify = options?.verify ?? false;
@@ -105,7 +105,13 @@ export class RegistryWriter {
         continue;
       }
       try {
-        registry.register(mod.moduleId, fm);
+        // apcore's `register()` returns `Promise<void>` and surfaces
+        // async onLoad / async-validator failures as a rejected promise.
+        // Await it so those land in this catch (instead of becoming an
+        // unhandled rejection) and so verification below sees the module
+        // after a deferred-publish onLoad has resolved. Sync registrations
+        // resolve immediately, so this is a no-op for the common path.
+        await registry.register(mod.moduleId, fm);
       } catch (err) {
         results.push(
           createWriteResult(
