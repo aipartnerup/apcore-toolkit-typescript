@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-07-07
+
+Cross-language parity with the Python toolkit: ship the reusable annotation-preservation conformance verifier. (The dropped-annotations bug that motivated this existed only in two Python adapters; `nestjs-apcore` and this toolkit's writers already preserve annotations — verified. This adds the guard so a future TS adapter can't silently regress.) All 617 tests pass.
+
+### Added
+
+- **`assertAnnotationsPreserved(writer, scannedModule, registry, fields?)`** (`src/conformance.ts`, exported from the package root) — a framework-agnostic verifier (throws on failure) that registers a module and asserts its behavioral annotations survive `registry.getDefinition`. Adapters import it into their own test suites so a dropped-annotations regression fails loudly. Defaults to checking `requiresApproval` / `destructive`. Covered by `tests/conformance.test.ts` (passes for the base writer using a **real** `Registry`, throws for a writer that drops annotations). Mirrors `apcore_toolkit.conformance.assert_annotations_preserved` in Python.
+
 ## [0.9.0] - 2026-06-23
 
 Minor release. Fixes registry verification and async registration against the real apcore Registry. No public API changes; all 614 tests pass.

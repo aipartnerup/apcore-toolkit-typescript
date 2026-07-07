@@ -17,6 +17,7 @@ npm install apcore-toolkit
 - Abstract `BaseScanner` for framework-specific endpoint scanning
 - OpenAPI schema extraction (`extractInputSchema`, `extractOutputSchema`)
 - Multi-format output writers (YAML, TypeScript, Registry, HTTP-proxy) with pluggable verification
+- `assertAnnotationsPreserved` conformance check — guards that a writer keeps behavioral annotations through registration (so approval/ACL gating cannot be silently disabled)
 - Markdown formatting with depth control and table heuristics
 - Module serialization utilities
 - Runtime-neutral subset via `apcore-toolkit/browser` for browser / edge / worker environments
@@ -80,6 +81,25 @@ await regWriter.write(modules, registry);
 
 // Or use the factory
 const writer = getWriter('yaml'); // 'yaml' | 'typescript' | 'registry'
+```
+
+### Conformance Verification
+
+Approval and ACL gating key on a module's `requiresApproval` annotation, which is
+only reachable if annotations survive `scan → register → getDefinition`. A writer
+that drops them disables that gate **silently**. Run the shared check in your
+adapter's test suite so any such regression fails loudly:
+
+```typescript
+import { Registry, createAnnotations } from 'apcore-js';
+import { assertAnnotationsPreserved } from 'apcore-toolkit';
+
+// Throws if annotations were dropped or changed during registration.
+await assertAnnotationsPreserved(
+  new MyRegistryWriter(),
+  myScannedModule({ annotations: createAnnotations({ destructive: true, requiresApproval: true }) }),
+  new Registry(),
+);
 ```
 
 ### OpenAPI Schema Extraction
@@ -205,6 +225,7 @@ The **Browser** column marks whether a symbol is also re-exported from
 | `HTTPProxyRegistryWriter` | ✓ | Registers modules as HTTP-proxied entries in an in-memory registry. Each module's `execute()` forwards inputs to a backend URL via global `fetch`. Works in any runtime with `fetch` (Node 20+, browsers, edge, workers). |
 | `HTTPProxyRegistryWriterError` | ✓ | Error class thrown when HTTP fields cannot be extracted from a `ScannedModule` |
 | `getWriter()` | | Factory for writer instances |
+| `assertAnnotationsPreserved()` | ✓ | Conformance check for adapter test suites: registers a module and asserts its behavioral annotations (`requiresApproval` / `destructive`) survive `getDefinition`; throws otherwise. Guards against a writer silently disabling approval/ACL gating |
 | `extractInputSchema()` | ✓ | Extract input schema from OpenAPI operation |
 | `extractOutputSchema()` | ✓ | Extract output schema from OpenAPI operation |
 | `resolveRef()` | ✓ | Resolve `$ref` in OpenAPI documents |

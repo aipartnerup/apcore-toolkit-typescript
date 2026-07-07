@@ -71,6 +71,8 @@ export type {
   ProxyRegistry,
 } from './output/http-proxy-writer.js';
 export { getWriter } from './output/factory.js';
+export { assertAnnotationsPreserved, DEFAULT_CONFORMANCE_FIELDS } from './conformance.js';
+export type { AnnotationCarryingRegistry, AnnotationWriter } from './conformance.js';
 export type { WriteResult, VerifyResult, Verifier } from './output/types.js';
 // TS-only ergonomic factory: Python/Rust callers construct WriteResult directly
 // via dataclass/struct literals. No counterpart in apcore-toolkit-python/-rust.
