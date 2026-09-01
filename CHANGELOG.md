@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.2] - 2026-09-01
+
+Patch release. Bumps the required `apcore-js` floor to `0.28.0`. The 0.28.0 release is scoped entirely to the ACL/Executor governance layer (argument-scoped approval, `ACL.defaultEffect`/`rules` accessors, `ACL.validateRules()`, `ExecutionPolicy.resolve()` call-site parameters, `Executor.governanceState()`) — none of it touches `Registry`, `FunctionModule`, `jsonSchemaToTypeBox`, or module annotations, which is all this toolkit uses (confirmed via grep). No code or API changes; all 617 tests pass unmodified against apcore-js 0.28.0.
+
 ## [0.10.1] - 2026-07-14
 
 Patch release. Bumps the required `apcore-js` floor to `0.26.0` to align the ecosystem on the 0.26.0 governance layer (Execution Policy, governance events, no-handler fail-loud — additive, no breaking changes). No code or API changes.
