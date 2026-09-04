@@ -88,3 +88,32 @@ export type {
   HTTPProxyRegistryWriterOptions,
   ProxyRegistry,
 } from '../output/http-proxy-writer.js';
+
+// ---- OpenAPI scanner (pure — no I/O) --------------------------------------
+// `OpenAPIScanner.scan()` and `deriveModuleId` are pure document traversal
+// with no Node.js dependency. `loadSpec` (in `../openapi-loader.js`) is
+// intentionally NOT re-exported here — its local-file-path branch needs
+// Node's `fs`, matching how `BindingLoader` stays Node-only above.
+export { OpenAPIScanner, deriveModuleId, InvalidSpecError } from '../openapi-scanner.js';
+export type { OpenAPIScanOptions } from '../openapi-scanner.js';
+
+// ---- TUI view model (pure data, no Node.js dependency) --------------------
+export { modulesToViewModel, formatViewModel } from '../tui-view-model.js';
+export type {
+  TuiViewModel,
+  Column,
+  Row,
+  Cell,
+  Sort,
+  Filter,
+  TonePalette,
+  ToneRule,
+  Group,
+  View,
+  Justify,
+  Exposure,
+  Direction,
+  Tone,
+  CellKind,
+  ModulesToViewModelOptions,
+} from '../tui-view-model.js';

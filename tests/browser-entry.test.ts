@@ -149,6 +149,13 @@ describe('browser entry point', () => {
       // HTTP proxy writer
       'HTTPProxyRegistryWriter',
       'HTTPProxyRegistryWriterError',
+      // OpenAPI scanner (pure)
+      'OpenAPIScanner',
+      'deriveModuleId',
+      'InvalidSpecError',
+      // TUI view model (pure)
+      'modulesToViewModel',
+      'formatViewModel',
     ];
     for (const name of expected) {
       expect(browser, `expected "${name}" to be exported`).toHaveProperty(name);
@@ -172,6 +179,7 @@ describe('browser entry point', () => {
       'MagicBytesVerifier',
       'JSONVerifier',
       'VERSION',
+      'loadSpec',
     ];
     for (const name of nodeOnly) {
       expect(browser, `"${name}" must not be exported from /browser`).not.toHaveProperty(name);

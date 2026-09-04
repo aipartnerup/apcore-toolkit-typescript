@@ -71,6 +71,29 @@ export type {
   ProxyRegistry,
 } from './output/http-proxy-writer.js';
 export { getWriter } from './output/factory.js';
+export { OpenAPIScanner, deriveModuleId, InvalidSpecError } from './openapi-scanner.js';
+export type { OpenAPIScanOptions } from './openapi-scanner.js';
+export { loadSpec } from './openapi-loader.js';
+export type { LoadSpecOptions } from './openapi-loader.js';
+export { modulesToViewModel, formatViewModel } from './tui-view-model.js';
+export type {
+  TuiViewModel,
+  Column,
+  Row,
+  Cell,
+  Sort,
+  Filter,
+  TonePalette,
+  ToneRule,
+  Group,
+  View,
+  Justify,
+  Exposure,
+  Direction,
+  Tone,
+  CellKind,
+  ModulesToViewModelOptions,
+} from './tui-view-model.js';
 export { assertAnnotationsPreserved, DEFAULT_CONFORMANCE_FIELDS } from './conformance.js';
 export type { AnnotationCarryingRegistry, AnnotationWriter } from './conformance.js';
 export type { WriteResult, VerifyResult, Verifier } from './output/types.js';

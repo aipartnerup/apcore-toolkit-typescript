@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-09-04
+
+Feature release: ships `OpenAPIScanner` and `TuiViewModel`, version-aligned with the Python and Rust SDKs.
+
+### Added
+
+- **`OpenAPIScanner`, `deriveModuleId`** (`src/openapi-scanner.ts`) and **`loadSpec`** (`src/openapi-loader.ts`, Node-only — kept in a separate file so `OpenAPIScanner` stays importable from `apcore-toolkit/browser`) — turn an OpenAPI 3.0/3.1 document into a `ScannedModule[]`, one module per operation. Re-exported from the package root and (excluding `loadSpec`) from `apcore-toolkit/browser`.
+- **`TuiViewModel`, `Column`, `Row`, `Cell`, `Sort`, `Filter`, `TonePalette`, `ToneRule`, `Group`, `modulesToViewModel`, `formatViewModel`** (`src/tui-view-model.ts`) — byte-equivalent module-list view-model builder and canonical JSON encoder. Re-exported from the package root and `apcore-toolkit/browser` (pure, no Node dependency).
+- 40 new tests: 35 conformance cases against the shared corpus in `apcore-toolkit/conformance/fixtures/` (`tests/openapi-scan-conformance.test.ts`, `tests/view-model-conformance.test.ts`), plus hand-written regression tests (`tests/openapi-scanner.test.ts`, `tests/tui-view-model.test.ts`).
+
+### Fixed
+
+- **`TuiViewModel`'s `Filter.annotations` silently excluded every module when filtering by `requires_approval` or `open_world`.** The filter's flag names are the spec's snake_case (matching Python/Rust), but the installed `apcore-js` `ModuleAnnotations` type uses camelCase fields, so the raw property lookup always returned `undefined`. Fixed with an explicit snake_case → camelCase name mapping; regression tests added. Single-word flags (`readonly`, `destructive`, `idempotent`, `streaming`, `cacheable`, `paginated`, `discoverable`) were unaffected.
+- **`OpenAPIScanner`'s `deprecated` field used truthy coercion instead of a strict boolean check.** A malformed non-boolean value (e.g. the string `"false"`) was treated as deprecated; now requires the literal `true`, matching Rust.
+- Non-string `operationId` no longer leaks into `metadata.openapi.operation_id`.
+
+All 657 tests pass (was 652 at 0.10.2). `tsc --noEmit` and `npm run build` clean.
+
 ## [0.10.2] - 2026-09-01
 
 Patch release. Bumps the required `apcore-js` floor to `0.28.0`. The 0.28.0 release is scoped entirely to the ACL/Executor governance layer (argument-scoped approval, `ACL.defaultEffect`/`rules` accessors, `ACL.validateRules()`, `ExecutionPolicy.resolve()` call-site parameters, `Executor.governanceState()`) — none of it touches `Registry`, `FunctionModule`, `jsonSchemaToTypeBox`, or module annotations, which is all this toolkit uses (confirmed via grep). No code or API changes; all 617 tests pass unmodified against apcore-js 0.28.0.
