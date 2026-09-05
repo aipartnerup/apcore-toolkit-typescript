@@ -232,9 +232,26 @@ The **Browser** column marks whether a symbol is also re-exported from
 | `resolveSchema()` | ✓ | Resolve schema with single-level `$ref` support |
 | `deepResolveRefs()` | ✓ | Recursively resolve all nested `$ref` pointers in a schema |
 | `enrichSchemaDescriptions()` | ✓ | Merge parameter descriptions into schema |
+| `OpenAPIScanner` _(v0.11.0)_ | ✓ | Turn an OpenAPI 3.x document into `ScannedModule[]`. Pure and synchronous — no I/O |
+| `OpenAPIScanOptions` _(v0.11.0)_ | ✓ | Options for `OpenAPIScanner.scan()` |
+| `deriveModuleId()` _(v0.11.0)_ | ✓ | Derive a stable, byte-identical `moduleId` for an OpenAPI operation; primary subject of the cross-SDK conformance corpus |
+| `InvalidSpecError` _(v0.11.0)_ | ✓ | Thrown by `OpenAPIScanner.scan()` when the input isn't a recognisable OpenAPI 3.0.x/3.1.x document |
+| `loadSpec()` _(v0.11.0)_ | | Fetch/parse an OpenAPI document from a local filesystem path or an `http(s)://` URL |
+| `LoadSpecOptions` _(v0.11.0)_ | | Options for `loadSpec()` |
 | `toMarkdown()` | ✓ | Convert dict to formatted Markdown |
 | `formatCsv()` _(v0.7.0)_ | | Byte-equivalent RFC 4180 CSV. Header = union of keys; canonical JSON for nested cells; CRLF terminator |
 | `formatJsonl()` _(v0.7.0)_ | | Byte-equivalent JSON Lines. Compact JSON per row, LF terminator |
+| `TuiViewModel` _(v0.11.0)_ | ✓ | The V1 `TuiViewModel` wire-format envelope: columns, rows, sort/filter intent, tone palette |
+| `modulesToViewModel()` _(v0.11.0)_ | ✓ | Build a byte-equivalent `TuiViewModel` from scanned modules |
+| `formatViewModel()` _(v0.11.0)_ | ✓ | Canonical, byte-identical compact JSON encoding of a `TuiViewModel` |
+| `Column` _(v0.11.0)_ | ✓ | A view-model column: render order and `Row.cells` index lookup |
+| `Row` _(v0.11.0)_ | ✓ | A view-model row; `cells[i]` corresponds to `columns[i]` |
+| `Cell` _(v0.11.0)_ | ✓ | A single table cell (discriminated union by `kind`) |
+| `Sort` _(v0.11.0)_ | ✓ | Annotates which sort the toolkit (or the caller) applied |
+| `Filter` _(v0.11.0)_ | ✓ | Annotates which filter the toolkit applied |
+| `TonePalette` _(v0.11.0)_ | ✓ | A named, ordered set of `ToneRule` |
+| `ToneRule` _(v0.11.0)_ | ✓ | First-match-wins rule mapping a tag to a semantic tone |
+| `Group` _(v0.11.0)_ | ✓ | A named group of row indices, present only when `kind === "grouped"` |
 | `moduleToDict()` | ✓ | Serialize module to snake_case dict |
 | `modulesToDicts()` | ✓ | Batch serialize modules |
 | `annotationsToDict()` | ✓ | Convert annotations to plain dict |
