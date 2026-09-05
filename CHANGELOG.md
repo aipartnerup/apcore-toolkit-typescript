@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.11.0] - 2026-09-04
+## [0.11.0] - 2026-09-05
 
 Feature release: ships `OpenAPIScanner` and `TuiViewModel`, version-aligned with the Python and Rust SDKs.
 
@@ -11,6 +11,10 @@ Feature release: ships `OpenAPIScanner` and `TuiViewModel`, version-aligned with
 - **`OpenAPIScanner`, `deriveModuleId`** (`src/openapi-scanner.ts`) and **`loadSpec`** (`src/openapi-loader.ts`, Node-only — kept in a separate file so `OpenAPIScanner` stays importable from `apcore-toolkit/browser`) — turn an OpenAPI 3.0/3.1 document into a `ScannedModule[]`, one module per operation. Re-exported from the package root and (excluding `loadSpec`) from `apcore-toolkit/browser`.
 - **`TuiViewModel`, `Column`, `Row`, `Cell`, `Sort`, `Filter`, `TonePalette`, `ToneRule`, `Group`, `modulesToViewModel`, `formatViewModel`** (`src/tui-view-model.ts`) — byte-equivalent module-list view-model builder and canonical JSON encoder. Re-exported from the package root and `apcore-toolkit/browser` (pure, no Node dependency).
 - 40 new tests: 35 conformance cases against the shared corpus in `apcore-toolkit/conformance/fixtures/` (`tests/openapi-scan-conformance.test.ts`, `tests/view-model-conformance.test.ts`), plus hand-written regression tests (`tests/openapi-scanner.test.ts`, `tests/tui-view-model.test.ts`).
+
+### Changed
+
+- **Required `apcore-js` floor raised to `0.29.0`.** apcore-js 0.29.0 adds `ApprovalRequest.callerId` / `.action` and `CancelToken.raiseIfCancelled()` (both additive), changes `AsyncTaskManager.startReaper()` to return `Promise<ReaperHandle>` (breaking only for a caller that does not `await` it), and closes the ACL pattern-array shape at every entry point — `callers` / `targets` of `[]`, `['$or']`, `['$not']` or the multi-operand `['$not', p1, p2]` are now refused with `ACLRuleError` instead of silently matching nothing ([apcore#112](https://github.com/aiperceivable/apcore/issues/112)). None of it touches the surface this toolkit imports: `FunctionModule`, `Registry`, `jsonSchemaToTypeBox`, `ModuleAnnotations`, `ModuleExample`, `Context`, `DEFAULT_ANNOTATIONS`, `annotationsToJSON` and `annotationsFromJSON` are the complete set (confirmed by grepping every `from 'apcore-js'` in `src/`; no `ACL`, `ApprovalRequest`, `CancelToken` or `AsyncTaskManager` reference exists). No code or API changes; all 657 tests pass unmodified against apcore-js 0.29.0, and `apdev-js check-imports --package apcore-js` is clean.
 
 ### Fixed
 
