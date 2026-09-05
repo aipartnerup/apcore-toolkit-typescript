@@ -144,8 +144,20 @@ export class RegistryWriter {
     if (streamingRequested) {
       const resolvedObj = resolved as Record<string, unknown>;
       const streamMethod = resolvedObj['stream'];
+      // A function is only a valid streaming implementation if it is an
+      // async generator function (`async function* () {}`), i.e. calling it
+      // actually produces an AsyncGenerator. A plain synchronous (or plain
+      // async, non-generator) function named `stream` would pass a bare
+      // `typeof streamMethod === 'function'` check but fail later at CALL
+      // time when the caller tries to async-iterate its return value.
+      // Mirrors the Python SDK's `inspect.iscoroutinefunction` /
+      // `inspect.isasyncgenfunction` guard in registry_writer.py.
+      const isAsyncGeneratorFunction =
+        typeof streamMethod === 'function' &&
+        (streamMethod as { constructor?: { name?: string } }).constructor?.name ===
+          'AsyncGeneratorFunction';
 
-      if (typeof streamMethod === 'function') {
+      if (isAsyncGeneratorFunction) {
         // Target exposes a stream() method — build StreamingFunctionModule.
         // For the execute path prefer the target's execute() when present;
         // fall back to treating the resolved value as a plain function.

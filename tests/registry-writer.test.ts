@@ -217,4 +217,38 @@ describe('streaming module detection (apcore 0.22.0)', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('streaming'));
     warnSpy.mockRestore();
   });
+
+  it('clears streaming flag and warns when stream() is a plain synchronous function (not an async generator)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // A synchronous function named `stream` should NOT be mistaken for an
+    // async-generator streaming implementation — `typeof fn === 'function'`
+    // is true for both, but only `async function* () {}` actually produces
+    // an AsyncGenerator when called. Wrapping this as StreamingFunctionModule
+    // would fail later at call time (async-iterating a plain return value)
+    // instead of being caught here at registration time.
+    const syncStream = (_inputs: Record<string, unknown>) => ({ chunk: 1 });
+    const targetFn = (_inputs: Record<string, unknown>) => ({ result: 'ok' });
+    (targetFn as unknown as { stream: typeof syncStream }).stream = syncStream;
+    mockResolveTarget.mockResolvedValueOnce(targetFn as unknown as ((...args: unknown[]) => unknown));
+
+    const STREAMING_MARKER_SYM = Symbol.for('apcore.streaming');
+    const writer = new RegistryWriter();
+    const mod = createScannedModule({
+      ...REQUIRED_FIELDS,
+      moduleId: 'stream.sync_impl',
+      annotations: createAnnotations({ streaming: true }),
+    });
+    const registry = { register: vi.fn() };
+    const results = await writer.write([mod], registry);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].verified).toBe(true);
+    const registered = registry.register.mock.calls[0][1] as Record<string | symbol, unknown>;
+    expect(registered[STREAMING_MARKER_SYM]).toBeUndefined();
+    expect(typeof (registered as Record<string, unknown>)['stream']).not.toBe('function');
+    const ann = registered['annotations'] as Record<string, unknown> | null;
+    expect(ann?.['streaming']).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('streaming'));
+    warnSpy.mockRestore();
+  });
 });
