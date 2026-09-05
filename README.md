@@ -80,7 +80,7 @@ const regWriter = new RegistryWriter();
 await regWriter.write(modules, registry);
 
 // Or use the factory
-const writer = getWriter('yaml'); // 'yaml' | 'typescript' | 'registry'
+const writer = getWriter('yaml'); // 'yaml' | 'typescript' | 'registry' | 'http-proxy'
 ```
 
 ### Conformance Verification
