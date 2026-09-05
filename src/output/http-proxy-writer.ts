@@ -197,6 +197,18 @@ export class HTTPProxyRegistryWriter {
         `Invalid base_url protocol "${parsed.protocol}" — must be http or https`,
       );
     }
+
+    // Validate `timeoutMs` up-front so a misconfigured writer fails at
+    // construction rather than every request aborting almost immediately
+    // with no diagnostic. Mirrors Rust's
+    // `timeout_secs.is_finite() && timeout_secs > 0.0` check in
+    // `HTTPProxyRegistryWriter::new`.
+    if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0) {
+      throw new HTTPProxyRegistryWriterError(
+        'constructor',
+        `Invalid timeoutMs ${String(this.timeoutMs)} — must be a finite number greater than 0`,
+      );
+    }
   }
 
   /**

@@ -307,6 +307,74 @@ describe('HTTPProxyRegistryWriter', () => {
     });
   });
 
+  // Regression: `timeoutMs` was accepted with no validation and fed straight
+  // into `setTimeout(() => controller.abort(), timeoutMs)`, so a non-positive
+  // value silently aborted every proxied request almost immediately with no
+  // diagnostic. Mirrors Rust's `timeout_secs.is_finite() && timeout_secs > 0.0`
+  // check in `HTTPProxyRegistryWriter::new`.
+  describe('timeoutMs validation', () => {
+    const dummyFetch: typeof fetch = async () => new Response('{}');
+
+    it('rejects a zero timeoutMs at construction', () => {
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'http://x',
+            timeoutMs: 0,
+            fetchImpl: dummyFetch,
+          }),
+      ).toThrow(HTTPProxyRegistryWriterError);
+    });
+
+    it('rejects a negative timeoutMs at construction', () => {
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'http://x',
+            timeoutMs: -1000,
+            fetchImpl: dummyFetch,
+          }),
+      ).toThrow(HTTPProxyRegistryWriterError);
+    });
+
+    it('rejects a non-finite timeoutMs at construction', () => {
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'http://x',
+            timeoutMs: Infinity,
+            fetchImpl: dummyFetch,
+          }),
+      ).toThrow(HTTPProxyRegistryWriterError);
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'http://x',
+            timeoutMs: NaN,
+            fetchImpl: dummyFetch,
+          }),
+      ).toThrow(HTTPProxyRegistryWriterError);
+    });
+
+    it('accepts a positive finite timeoutMs and the default (unset)', () => {
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'http://x',
+            timeoutMs: 5000,
+            fetchImpl: dummyFetch,
+          }),
+      ).not.toThrow();
+      expect(
+        () =>
+          new HTTPProxyRegistryWriter({
+            baseUrl: 'http://x',
+            fetchImpl: dummyFetch,
+          }),
+      ).not.toThrow();
+    });
+  });
+
   // Issue 2 (BLOCKER): HTTPProxyRegistryWriter must read snake_case metadata keys
   // Python and Rust scanners produce http_method / url_path (snake_case).
   describe('snake_case metadata key parity', () => {
