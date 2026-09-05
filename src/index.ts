@@ -57,7 +57,12 @@ export type {
   DisplayMetadata,
   SurfaceDisplay,
 } from './display/resolver.js';
-export { BindingLoader, BindingLoadError } from './binding-loader.js';
+export {
+  BindingLoader,
+  BindingLoadError,
+  BindingParser,
+  parseBindingDocument,
+} from './binding-loader.js';
 export type { BindingLoadOptions } from './binding-loader.js';
 export { YAMLWriter } from './output/yaml-writer.js';
 export { TypeScriptWriter } from './output/typescript-writer.js';

@@ -11,6 +11,8 @@ import {
   deduplicateIds,
   inferAnnotationsFromMethod,
   createScannedModule,
+  BindingParser,
+  parseBindingDocument,
 } from '../src/index.js';
 import type { ScannedModule } from '../src/index.js';
 
@@ -105,5 +107,38 @@ describe('inferAnnotationsFromMethod (package-level free function)', () => {
   it('POST → all defaults', () => {
     const ann = inferAnnotationsFromMethod('POST');
     expect(ann).toEqual({ ...DEFAULT_ANNOTATIONS });
+  });
+});
+
+describe('BindingParser / parseBindingDocument (main entry point export)', () => {
+  // Regression: binding-loader.ts re-exports BindingParser and
+  // parseBindingDocument from binding-parser.ts, and its own doc comment
+  // states they are "now also available" via the default package entry
+  // (`apcore-toolkit`). index.ts's re-export line only pulled
+  // `{ BindingLoader, BindingLoadError }` from './binding-loader.js', so a
+  // consumer importing from the package root (as tested here) got nothing
+  // for these two symbols even though they were reachable via
+  // `apcore-toolkit/browser`.
+
+  it('is callable directly from the package root', () => {
+    expect(typeof BindingParser).toBe('function');
+    expect(typeof parseBindingDocument).toBe('function');
+  });
+
+  it('parseBindingDocument parses a minimal binding document into ScannedModule[]', () => {
+    const modules = parseBindingDocument({
+      bindings: [{ module_id: 'x', target: 'y:z' }],
+    });
+    expect(modules).toHaveLength(1);
+    expect(modules[0].moduleId).toBe('x');
+    expect(modules[0].target).toBe('y:z');
+  });
+
+  it('BindingParser.loadData parses a minimal binding document into ScannedModule[]', () => {
+    const modules = new BindingParser().loadData({
+      bindings: [{ module_id: 'x', target: 'y:z' }],
+    });
+    expect(modules).toHaveLength(1);
+    expect(modules[0].moduleId).toBe('x');
   });
 });
