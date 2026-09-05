@@ -225,7 +225,7 @@ The **Browser** column marks whether a symbol is also re-exported from
 | `HTTPProxyRegistryWriter` | ✓ | Registers modules as HTTP-proxied entries in an in-memory registry. Each module's `execute()` forwards inputs to a backend URL via global `fetch`. Works in any runtime with `fetch` (Node 20+, browsers, edge, workers). |
 | `HTTPProxyRegistryWriterError` | ✓ | Error class thrown when HTTP fields cannot be extracted from a `ScannedModule` |
 | `getWriter()` | | Factory for writer instances |
-| `assertAnnotationsPreserved()` | ✓ | Conformance check for adapter test suites: registers a module and asserts its behavioral annotations (`requiresApproval` / `destructive`) survive `getDefinition`; throws otherwise. Guards against a writer silently disabling approval/ACL gating |
+| `assertAnnotationsPreserved()` | | Conformance check for adapter test suites: registers a module and asserts its behavioral annotations (`requiresApproval` / `destructive`) survive `getDefinition`; throws otherwise. Guards against a writer silently disabling approval/ACL gating |
 | `extractInputSchema()` | ✓ | Extract input schema from OpenAPI operation |
 | `extractOutputSchema()` | ✓ | Extract output schema from OpenAPI operation |
 | `resolveRef()` | ✓ | Resolve `$ref` in OpenAPI documents |
@@ -233,8 +233,8 @@ The **Browser** column marks whether a symbol is also re-exported from
 | `deepResolveRefs()` | ✓ | Recursively resolve all nested `$ref` pointers in a schema |
 | `enrichSchemaDescriptions()` | ✓ | Merge parameter descriptions into schema |
 | `toMarkdown()` | ✓ | Convert dict to formatted Markdown |
-| `formatCsv()` _(v0.7.0)_ | ✓ | Byte-equivalent RFC 4180 CSV. Header = union of keys; canonical JSON for nested cells; CRLF terminator |
-| `formatJsonl()` _(v0.7.0)_ | ✓ | Byte-equivalent JSON Lines. Compact JSON per row, LF terminator |
+| `formatCsv()` _(v0.7.0)_ | | Byte-equivalent RFC 4180 CSV. Header = union of keys; canonical JSON for nested cells; CRLF terminator |
+| `formatJsonl()` _(v0.7.0)_ | | Byte-equivalent JSON Lines. Compact JSON per row, LF terminator |
 | `moduleToDict()` | ✓ | Serialize module to snake_case dict |
 | `modulesToDicts()` | ✓ | Batch serialize modules |
 | `annotationsToDict()` | ✓ | Convert annotations to plain dict |
