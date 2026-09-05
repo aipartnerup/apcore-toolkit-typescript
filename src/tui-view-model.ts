@@ -52,6 +52,28 @@ const ANNOTATION_FIELD_ALIASES: Readonly<Record<string, string>> = {
   open_world: 'openWorld',
 };
 
+// `Filter.annotations` recognizes exactly the 9 canonical boolean
+// `ModuleAnnotations` flags (matching Rust's hardcoded 9-way match and
+// Python's explicit frozenset) — never the non-boolean `cacheTtl` /
+// `cacheKeyFields` / `paginationStyle` / `extra` fields. Those would
+// otherwise either silently miss (multi-word names not in the alias map
+// above, evaluated against the wrong un-aliased key) or, worse, accidentally
+// "work" via a truthy-object check (`extra` is a dict, always present and
+// therefore always truthy) that never reflects the caller's intent. An
+// unrecognized name excludes every module, exactly as if the flag were
+// `false`.
+const FILTERABLE_ANNOTATION_FLAGS: ReadonlySet<string> = new Set([
+  'readonly',
+  'destructive',
+  'idempotent',
+  'requires_approval',
+  'open_world',
+  'streaming',
+  'cacheable',
+  'paginated',
+  'discoverable',
+]);
+
 /** A single table cell (discriminated union by `kind`). */
 export interface Cell {
   kind: CellKind;
@@ -264,6 +286,7 @@ function passesFilter(module: ScannedModule, flt: Filter | null, description: st
   const annotations = module.annotations;
   const annotationsRecord = annotations as unknown as Record<string, unknown> | null;
   for (const annotationName of flt.annotations) {
+    if (!FILTERABLE_ANNOTATION_FLAGS.has(annotationName)) return false;
     const fieldName = ANNOTATION_FIELD_ALIASES[annotationName] ?? annotationName;
     if (!annotationsRecord || !annotationsRecord[fieldName]) return false;
   }

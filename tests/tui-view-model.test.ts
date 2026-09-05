@@ -95,3 +95,106 @@ describe('Filter.annotations — snake_case flag name lookup', () => {
     expect(vm.rows).toHaveLength(0);
   });
 });
+
+describe('Filter.annotations — restricted to the 9 canonical boolean flags', () => {
+  it('excludes a module filtered by the non-boolean "extra" field even though it is present and truthy', () => {
+    // `extra` is always a (possibly empty) dict, so a naive
+    // `annotationsRecord[fieldName]` truthy check on it always passes,
+    // regardless of the caller's intent — it must never be a recognized
+    // filter name.
+    const module = createScannedModule({
+      moduleId: 'a.one',
+      description: 'A one',
+      inputSchema: {},
+      outputSchema: {},
+      tags: [],
+      target: 'x',
+      annotations: createAnnotations({ extra: { note: 'anything' } }),
+    });
+
+    const filter: Filter = {
+      tags: [],
+      search: '',
+      annotations: ['extra'],
+      exposure: 'all',
+      deprecated: true,
+    };
+
+    const vm = modulesToViewModel([module], {
+      view: 'list',
+      columns: ['module_id'],
+      filter,
+    });
+
+    expect(vm.rows).toHaveLength(0);
+  });
+
+  it('excludes a module filtered by the non-boolean multi-word "pagination_style" field', () => {
+    const module = createScannedModule({
+      moduleId: 'a.one',
+      description: 'A one',
+      inputSchema: {},
+      outputSchema: {},
+      tags: [],
+      target: 'x',
+      annotations: createAnnotations({ paginationStyle: 'cursor' }),
+    });
+
+    const filter: Filter = {
+      tags: [],
+      search: '',
+      annotations: ['pagination_style'],
+      exposure: 'all',
+      deprecated: true,
+    };
+
+    const vm = modulesToViewModel([module], {
+      view: 'list',
+      columns: ['module_id'],
+      filter,
+    });
+
+    expect(vm.rows).toHaveLength(0);
+  });
+
+  it.each([
+    ['readonly', { readonly: true }],
+    ['destructive', { destructive: true }],
+    ['idempotent', { idempotent: true }],
+    ['requires_approval', { requiresApproval: true }],
+    ['open_world', { openWorld: true }],
+    ['streaming', { streaming: true }],
+    ['cacheable', { cacheable: true }],
+    ['paginated', { paginated: true }],
+    ['discoverable', { discoverable: true }],
+  ] as const)(
+    'still includes a module when the canonical boolean flag "%s" is true and filtered by that name',
+    (name, override) => {
+      const module = createScannedModule({
+        moduleId: 'a.one',
+        description: 'A one',
+        inputSchema: {},
+        outputSchema: {},
+        tags: [],
+        target: 'x',
+        annotations: createAnnotations(override),
+      });
+
+      const filter: Filter = {
+        tags: [],
+        search: '',
+        annotations: [name],
+        exposure: 'all',
+        deprecated: true,
+      };
+
+      const vm = modulesToViewModel([module], {
+        view: 'list',
+        columns: ['module_id'],
+        filter,
+      });
+
+      expect(vm.rows).toHaveLength(1);
+    },
+  );
+});
