@@ -44,4 +44,21 @@ describe('OpenAPIScanner — malformed field-type handling', () => {
     const id = deriveModuleId('/widgets', 'get', { operationId: 'create\u{1F600}User' });
     expect(id).toBe('create_User');
   });
+
+  // Regression: `tags` was cast with `as string[]` — a compile-time-only
+  // assertion with no runtime check — so non-string entries in a malformed
+  // spec's `tags` array (a number, `null`, etc.) passed straight through
+  // into `ScannedModule.tags`, violating its documented `string[]` type.
+  it('filters non-string entries out of operation.tags', () => {
+    const modules = scan({
+      '/widgets': {
+        get: {
+          tags: ['users', 5, null, 'active'],
+          responses: { 200: { description: 'ok' } },
+        },
+      },
+    });
+    expect(modules).toHaveLength(1);
+    expect(modules[0]!.tags).toEqual(['users', 'active']);
+  });
 });

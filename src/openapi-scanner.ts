@@ -365,7 +365,9 @@ export class OpenAPIScanner extends BaseScanner {
         }
 
         const rawTags = operation['tags'];
-        const tags = Array.isArray(rawTags) ? (rawTags as string[]) : [];
+        const tags = Array.isArray(rawTags)
+          ? rawTags.filter((t): t is string => typeof t === 'string')
+          : [];
 
         let module: ScannedModule = createScannedModule({
           moduleId: mid,
