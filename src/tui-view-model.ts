@@ -158,7 +158,12 @@ function cellToWire(cell: Cell): Record<string, unknown> {
   } else {
     d['value'] = cell.value ?? '';
   }
-  if (cell.tone != null) {
+  // `tone` is only a defined field for "text"/"badge"/"symbol" cells per the
+  // wire-format spec's Cell schema table — "tags" has no `tone` entry there,
+  // and Rust's Cell::Tags variant has no tone field at all (structurally
+  // cannot carry one). Suppress it here too so a hand-built toned "tags"
+  // cell doesn't silently diverge from what Rust can even represent.
+  if (cell.tone != null && cell.kind !== 'tags') {
     d['tone'] = cell.tone;
   }
   return d;
