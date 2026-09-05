@@ -46,7 +46,17 @@ const RECOGNIZED_METHODS: ReadonlySet<string> = new Set([
   'trace',
 ]);
 
-const SANITIZE_RE = /[^A-Za-z0-9_.-]/g;
+// The `u` flag makes this regex operate on Unicode CODE POINTS rather than
+// UTF-16 code UNITS. Without it, a non-BMP character (e.g. an emoji, encoded
+// as a UTF-16 surrogate pair) would be matched — and replaced with `_` —
+// once per surrogate half, producing two underscores where Python's
+// code-point-based `re` and Rust's Unicode-scalar-based `regex` crate each
+// produce exactly one. That would break the documented byte-for-byte
+// cross-SDK `derive_module_id` guarantee. DOT_RUN_RE and the leading/
+// trailing trim regexes below only ever match ASCII `.`/`_`, which are
+// single code units regardless of surrounding astral characters, so they
+// don't need the flag.
+const SANITIZE_RE = /[^A-Za-z0-9_.-]/gu;
 const DOT_RUN_RE = /\.+/g;
 
 /**
