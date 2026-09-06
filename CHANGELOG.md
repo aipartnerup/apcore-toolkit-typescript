@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.1] - 2026-09-06
+
+Patch release. Bumps the required `apcore-js` floor to `0.30.0`. apcore-js 0.30.0 adds `Config.projectRoot` / `userLevelConfigPaths()`, a new `Config.load` deprecation notice for out-of-tree relative path-typed values, discards a set-but-empty path-typed `APCORE_*` override, and fixes `loadBindingDir` to read `bindings.dir` from the passed `Config` instead of re-reading `APCORE_BINDINGS_DIR` directly — all `Config`/binding-loader internals this toolkit never touches. The complete apcore-js surface this toolkit imports is `ModuleAnnotations`, `ModuleExample`, `DEFAULT_ANNOTATIONS`, `annotationsFromJSON`, `annotationsToJSON`, `Context`, `FunctionModule`, `jsonSchemaToTypeBox`, `ErrorCodes` and `ModuleError` (confirmed via grep: no `Config`, `loadBindingDir`, `ACL`, `ApprovalRequest`, `CancelToken` or `Executor` reference exists in `src/`). No code or API changes; all 680 tests pass unmodified against apcore-js 0.30.0. `pre-commit run --all-files` (`apdev-js check-chars`, `apdev-js check-imports`, `tsc --noEmit`) and `pnpm build` clean.
+
 ## [0.11.0] - 2026-09-05
 
 Feature release: ships `OpenAPIScanner` and `TuiViewModel`, version-aligned with the Python and Rust SDKs.
